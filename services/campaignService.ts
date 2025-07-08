@@ -1,8 +1,9 @@
 
 
+
 import type { Campaign, CampaignLog, CampaignStatus, CampaignTarget } from '../types';
 import { supabase } from './supabaseClient';
-import type { Json, Database } from './database.types';
+import type { Database } from './database.types';
 
 function mapCampaignToDb(campaign: Partial<Campaign>): Database['public']['Tables']['campaigns']['Update'] {
     return {

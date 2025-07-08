@@ -1,12 +1,4 @@
 
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[]
-
 export interface Database {
   public: {
     Tables: {
@@ -16,36 +8,36 @@ export interface Database {
           user_id: string
           name: string
           status: string
-          nodes: Json
-          edges: Json
+          nodes: any
+          edges: any
           created_at: string
           allow_reactivation: boolean
           block_on_open_chat: boolean
-          execution_stats: Json | null
+          execution_stats: any | null
         }
         Insert: {
           id?: string
           user_id: string
           name: string
           status: string
-          nodes?: Json
-          edges?: Json
+          nodes?: any
+          edges?: any
           created_at?: string
           allow_reactivation?: boolean
           block_on_open_chat?: boolean
-          execution_stats?: Json | null
+          execution_stats?: any | null
         }
         Update: {
           id?: string
           user_id?: string
           name?: string
           status?: string
-          nodes?: Json
-          edges?: Json
+          nodes?: any
+          edges?: any
           created_at?: string
           allow_reactivation?: boolean
           block_on_open_chat?: boolean
-          execution_stats?: Json | null
+          execution_stats?: any | null
         }
       }
       campaigns: {
@@ -60,8 +52,8 @@ export interface Database {
           read_rate: number
           sent_date: string
           template_id: string
-          target: Json
-          logs: Json | null
+          target: any
+          logs: any | null
           created_at: string
         }
         Insert: {
@@ -75,8 +67,8 @@ export interface Database {
           read_rate?: number
           sent_date: string
           template_id: string
-          target: Json
-          logs?: Json | null
+          target: any
+          logs?: any | null
           created_at?: string
         }
         Update: {
@@ -90,8 +82,8 @@ export interface Database {
           read_rate?: number
           sent_date?: string
           template_id?: string
-          target?: Json
-          logs?: Json | null
+          target?: any
+          logs?: any | null
           created_at?: string
         }
       }
@@ -106,7 +98,7 @@ export interface Database {
           is_24h_window_open: boolean
           is_opted_out_of_automations: boolean | null
           funnel_column_id: string | null
-          custom_fields: Json | null
+          custom_fields: any | null
           created_at: string
         }
         Insert: {
@@ -119,7 +111,7 @@ export interface Database {
           is_24h_window_open?: boolean
           is_opted_out_of_automations?: boolean | null
           funnel_column_id?: string | null
-          custom_fields?: Json | null
+          custom_fields?: any | null
           created_at?: string
         }
         Update: {
@@ -132,7 +124,7 @@ export interface Database {
           is_24h_window_open?: boolean
           is_opted_out_of_automations?: boolean | null
           funnel_column_id?: string | null
-          custom_fields?: Json | null
+          custom_fields?: any | null
           created_at?: string
         }
       }
@@ -141,7 +133,7 @@ export interface Database {
           id: number;
           user_id: string;
           contact_id: number;
-          messages: Json;
+          messages: any;
           unread_count: number;
           updated_at: string;
           created_at: string;
@@ -150,7 +142,7 @@ export interface Database {
           id?: number;
           user_id: string;
           contact_id: number;
-          messages: Json;
+          messages: any;
           unread_count?: number;
           updated_at?: string;
           created_at?: string;
@@ -159,7 +151,7 @@ export interface Database {
           id?: number;
           user_id?: string;
           contact_id?: number;
-          messages?: Json;
+          messages?: any;
           unread_count?: number;
           updated_at?: string;
           created_at?: string;
@@ -170,21 +162,21 @@ export interface Database {
           id: string
           user_id: string
           name: string
-          columns: Json
+          columns: any
           created_at: string
         }
         Insert: {
           id?: string
           user_id: string
           name: string
-          columns: Json
+          columns: any
           created_at?: string
         }
         Update: {
           id?: string
           user_id?: string
           name?: string
-          columns?: Json
+          columns?: any
           created_at?: string
         }
       }
@@ -197,7 +189,7 @@ export interface Database {
           category: string
           language: string
           status: string
-          components: Json
+          components: any
           rejection_reason: string | null
           created_at: string
         }
@@ -209,7 +201,7 @@ export interface Database {
           category: string
           language: string
           status: string
-          components: Json
+          components: any
           rejection_reason?: string | null
           created_at?: string
         }
@@ -221,7 +213,7 @@ export interface Database {
           category?: string
           language?: string
           status?: string
-          components?: Json
+          components?: any
           rejection_reason?: string | null
           created_at?: string
         }
@@ -264,7 +256,7 @@ export interface Database {
           meta_connection_id: string
           resume_from_node_id: string
           execute_at: string
-          context: Json | null
+          context: any | null
           status: string
           error_message: string | null
           created_at: string
@@ -277,7 +269,7 @@ export interface Database {
           meta_connection_id: string
           resume_from_node_id: string
           execute_at: string
-          context?: Json | null
+          context?: any | null
           status?: string
           error_message?: string | null
           created_at?: string
@@ -290,7 +282,7 @@ export interface Database {
           meta_connection_id?: string
           resume_from_node_id?: string
           execute_at?: string
-          context?: Json | null
+          context?: any | null
           status?: string
           error_message?: string | null
           created_at?: string
@@ -307,8 +299,8 @@ export interface Database {
           origin: string
           version: string
           data_api_version: string
-          routing_model: Json
-          screens: Json
+          routing_model: any
+          screens: any
           created_at: string
         }
         Insert: {
@@ -321,8 +313,8 @@ export interface Database {
           origin: string
           version: string
           data_api_version: string
-          routing_model?: Json
-          screens?: Json
+          routing_model?: any
+          screens?: any
           created_at?: string
         }
         Update: {
@@ -335,8 +327,8 @@ export interface Database {
           origin?: string
           version?: string
           data_api_version?: string
-          routing_model?: Json
-          screens?: Json
+          routing_model?: any
+          screens?: any
           created_at?: string
         }
       }

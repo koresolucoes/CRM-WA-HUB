@@ -9,11 +9,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
-    "react-router-dom": "^7.6.3",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.22.3",
     "@supabase/supabase-js": "^2.50.3",
-    "recharts": "^3.0.2",
+    "recharts": "^2.12.7",
     "@google/genai": "^1.8.0",
     "uuid": "^11.1.0",
     "reactflow": "^11.11.4"

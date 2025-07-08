@@ -1,5 +1,6 @@
 
 
+
 import { v4 as uuidv4 } from 'uuid';
 import type {
     Automation, AutomationNode, TriggerCrmStageChangedData, TriggerTagAddedData, AutomationTriggerType,
@@ -10,7 +11,7 @@ import type {
 } from '../types';
 import { AutomationStatus } from '../types';
 import { supabase } from './supabaseClient';
-import type { Json, Database } from './database.types';
+import type { Database } from './database.types';
 import { getContactById, updateContact, setContactOptOutStatus, moveContactToCrmStage } from './contactService';
 import { sendAutomatedMessage, sendFlowMessage } from './chatService';
 import { sendMessage as sendTemplateMessage, getMessageTemplates, getActiveConnection } from './metaService';

@@ -1,9 +1,10 @@
 
 
+
 import { v4 as uuidv4 } from 'uuid';
 import type { MessageTemplate, TemplateComponent } from '../types';
 import { supabase } from './supabaseClient';
-import type { Json, Database } from './database.types';
+import type { Database } from './database.types';
 
 export async function getTemplates(): Promise<MessageTemplate[]> {
   // RLS will handle filtering by user_id

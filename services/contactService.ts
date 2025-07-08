@@ -1,8 +1,9 @@
 
 
+
 import { supabase } from './supabaseClient';
 import type { Contact, SheetContact, CrmStage } from '../types';
-import type { Database, Json } from './database.types';
+import type { Database } from './database.types';
 
 function mapContactFromDb(dbContact: any): Contact {
   const contact: Contact = {

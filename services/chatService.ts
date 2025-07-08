@@ -1,5 +1,6 @@
 
 
+
 import { v4 as uuidv4 } from 'uuid';
 import type { Conversation, ChatMessage, Contact, ActionSendMessageData, MetaConnection } from '../types';
 import { getActiveConnection, sendTextMessage, sendFlowMessage as sendFlowMessageApi } from './metaService';
