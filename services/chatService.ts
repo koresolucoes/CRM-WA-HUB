@@ -69,6 +69,10 @@ export async function addMessage(contactId: number, message: Omit<ChatMessage, '
     // Usa o cliente admin para operações de backend para garantir permissões.
     const client = providedUserId ? supabaseAdmin : supabase;
 
+    if (!client) {
+      throw new Error('Supabase client is not initialized. Check environment variables.');
+    }
+
     const { data: convo, error: getError } = await client.from('conversations').select('*').eq('contact_id', contactId).eq('user_id', userId).single();
      if (getError && getError.code !== 'PGRST116') {
         throw getError;

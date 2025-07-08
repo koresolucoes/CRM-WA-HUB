@@ -1,6 +1,6 @@
 
 
-import React from 'react';
+import type { ReactNode } from 'react';
 
 export enum CampaignStatus {
   CONCLUIDA = 'Concluída',
@@ -134,7 +134,7 @@ export interface StatCardData {
   subValue?: string;
   change: string;
   changeType: 'increase' | 'decrease';
-  icon: React.ReactNode;
+  icon: ReactNode;
 }
 
 export interface MetaConnection {
