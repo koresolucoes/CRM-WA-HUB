@@ -1,6 +1,10 @@
 
 
-import type { ReactNode } from 'react';
+import type { ReactElement, ReactPortal } from 'react';
+
+type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
+type ReactNode = ReactElement | string | number | ReactPortal | boolean | null | undefined;
+
 
 export enum CampaignStatus {
   CONCLUIDA = 'Concluída',
@@ -134,7 +138,7 @@ export interface StatCardData {
   subValue?: string;
   change: string;
   changeType: 'increase' | 'decrease';
-  icon: ReactNode;
+  icon: any;
 }
 
 export interface MetaConnection {
