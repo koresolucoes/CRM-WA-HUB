@@ -29,9 +29,8 @@ const mapFlowFromDb = (dbFlow: any): WhatsAppFlow => ({
     screens: dbFlow.screens || [],
 });
 
-const mapFlowToDb = (appFlow: Partial<WhatsAppFlow>) => ({
-    // id is intentionally omitted. For inserts, the DB generates it.
-    // For updates, the ID is used in the .eq() filter, not in the payload.
+const mapFlowToDb = (appFlow: Partial<WhatsAppFlow & { user_id?: string }>) => ({
+    user_id: appFlow.user_id,
     meta_flow_id: appFlow.metaFlowId,
     name: appFlow.name,
     endpoint_uri: appFlow.endpointUri,
@@ -44,6 +43,7 @@ const mapFlowToDb = (appFlow: Partial<WhatsAppFlow>) => ({
 });
 
 export async function getFlows(): Promise<WhatsAppFlow[]> {
+    // RLS filters by user_id
     const { data, error } = await supabase.from('whatsapp_flows').select('*').order('name');
     if (error) {
         console.error("Error fetching flows:", error);
@@ -53,6 +53,7 @@ export async function getFlows(): Promise<WhatsAppFlow[]> {
 }
 
 export async function getFlowById(id: string): Promise<WhatsAppFlow | null> {
+    // RLS filters by user_id
     const { data, error } = await supabase.from('whatsapp_flows').select('*').eq('id', id).single();
     if (error) {
         if (error.code === 'PGRST116') return null; // Not found
@@ -62,6 +63,9 @@ export async function getFlowById(id: string): Promise<WhatsAppFlow | null> {
 }
 
 export async function addFlow(): Promise<WhatsAppFlow> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Usuário não autenticado.");
+
     const newScreen: FlowScreen = {
         id: uuidv4(),
         screen_id: 'SCHEDULE_TEST_DRIVE',
@@ -79,7 +83,8 @@ export async function addFlow(): Promise<WhatsAppFlow> {
         }
     };
 
-    const newFlow: Omit<WhatsAppFlow, 'id'> = {
+    const newFlow: Omit<WhatsAppFlow, 'id'> & { user_id: string } = {
+        user_id: user.id,
         name: 'Agendamento de Test-Drive',
         status: FlowStatus.DRAFT,
         origin: 'local',
@@ -98,6 +103,7 @@ export async function addFlow(): Promise<WhatsAppFlow> {
 
 export async function updateFlow(flow: WhatsAppFlow): Promise<WhatsAppFlow> {
     const { id, ...updateData } = flow;
+    // RLS protects this update
     const { data, error } = await supabase
         .from('whatsapp_flows')
         .update(mapFlowToDb(updateData))
@@ -122,7 +128,7 @@ export async function deleteFlow(id: string): Promise<void> {
             });
         }
     }
-
+    // RLS protects this deletion
     const { error } = await supabase.from('whatsapp_flows').delete().eq('id', id);
     if (error) throw error;
     window.dispatchEvent(new CustomEvent('localDataChanged'));
@@ -134,6 +140,9 @@ export async function syncFlowsWithMeta(): Promise<void> {
         console.warn("Sync skipped: No active Meta connection.");
         return;
     }
+    
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
 
     const [metaFlows, localFlows] = await Promise.all([
         getFlowsFromMeta(connection),
@@ -144,7 +153,6 @@ export async function syncFlowsWithMeta(): Promise<void> {
         const existingLocal = localFlows.find(lf => lf.metaFlowId === metaFlow.metaFlowId);
         
         if (existingLocal) {
-            // Update existing flow with Meta's status and metadata, but preserve local content
             const updateData = {
                 name: metaFlow.name,
                 status: metaFlow.status,
@@ -155,13 +163,13 @@ export async function syncFlowsWithMeta(): Promise<void> {
             };
             return supabase.from('whatsapp_flows').update(updateData).eq('id', existingLocal.id);
         } else {
-            // Create new local representation of Meta flow
             const newFlowData = {
+                user_id: user.id,
                 meta_flow_id: metaFlow.metaFlowId,
                 name: metaFlow.name,
                 status: metaFlow.status,
-                version: metaFlow.version || "7.1", // Default value to prevent insert error
-                data_api_version: metaFlow.data_api_version || "3.0", // Default value to prevent insert error
+                version: metaFlow.version || "7.1",
+                data_api_version: metaFlow.data_api_version || "3.0",
                 endpoint_uri: metaFlow.endpointUri,
                 origin: 'meta',
                 routing_model: {},
@@ -177,10 +185,6 @@ export async function syncFlowsWithMeta(): Promise<void> {
             console.error("Failed to upsert a flow during sync:", result.reason);
         }
     });
-
-    // This event was causing an infinite loop on the FlowsPage.
-    // The page will refetch the data after sync anyway, so this is not needed.
-    // window.dispatchEvent(new CustomEvent('localDataChanged'));
 }
 
 export async function fetchAndStoreFlowContent(id: string): Promise<WhatsAppFlow> {
@@ -190,17 +194,16 @@ export async function fetchAndStoreFlowContent(id: string): Promise<WhatsAppFlow
 
     const jsonContent = await getFlowJsonContent(connection, flow.metaFlowId);
     
-    // Map API screens to local FlowScreen format
     const localScreens: FlowScreen[] = (jsonContent.screens || []).map((apiScreen: any) => {
         const layoutChildren: FlowComponent[] = (apiScreen.layout?.children || []).map((apiComp: any) => ({
             ...apiComp,
-            id: uuidv4() // Add local React key
+            id: uuidv4()
         }));
 
         return {
-            id: uuidv4(), // Add local React key for the screen itself
-            screen_id: apiScreen.id, // Map API id to our screen_id
-            title: apiScreen.id, // Use API id as title for editor by default
+            id: uuidv4(),
+            screen_id: apiScreen.id,
+            title: apiScreen.id,
             terminal: apiScreen.terminal,
             success: apiScreen.success,
             refresh_on_back: apiScreen.refresh_on_back,
@@ -229,12 +232,10 @@ export async function publishFlow(id: string): Promise<{success: boolean, errors
     let finalFlow = flow;
 
     if (flow.metaFlowId) {
-        // Existing flow: update assets first, then publish
         await updateFlowAsset(connection, flow);
         await publishExistingFlow(connection, flow.metaFlowId);
         finalFlow.status = FlowStatus.PUBLISHED;
     } else {
-        // New flow: create and publish in one go
         const result = await createFlowOnMeta(connection, flow, true);
         if (result.validation_errors) {
             return { success: false, errors: result.validation_errors };
@@ -256,11 +257,9 @@ export async function saveDraftFlow(id: string): Promise<{success: boolean, erro
     let finalFlow = flow;
 
     if (flow.metaFlowId) {
-        // Existing flow: just update its assets. This keeps it as a draft.
         await updateFlowAsset(connection, flow);
-        finalFlow.status = FlowStatus.DRAFT; // Ensure status is draft
+        finalFlow.status = FlowStatus.DRAFT;
     } else {
-        // New flow: create it as a draft on Meta
         const result = await createFlowOnMeta(connection, flow, false);
         if (result.validation_errors) {
             return { success: false, errors: result.validation_errors };
@@ -280,19 +279,16 @@ export async function generateFlowPreview(id: string): Promise<string> {
     let flow = await getFlowById(id);
     if (!connection || !flow) throw new Error("Conexão ou flow inválido para gerar a pré-visualização.");
 
-    // Ensure the flow exists on Meta's side before requesting a preview
     if (!flow.metaFlowId) {
         const result = await createFlowOnMeta(connection, flow, false);
         flow.metaFlowId = result.id;
         flow.status = FlowStatus.DRAFT;
         flow.origin = 'meta';
-        flow = await updateFlow(flow); // Save the new metaFlowId locally
+        flow = await updateFlow(flow);
     } else {
-        // If it exists, make sure its content is up-to-date
         await updateFlowAsset(connection, flow);
     }
     
-    // Now that we're sure it exists on Meta, get the preview URL
     const previewUrl = await getFlowPreviewUrl(connection, flow.metaFlowId);
     return previewUrl;
 }
@@ -312,11 +308,9 @@ export async function updateFlowMetadata(id: string, metadata: { name?: string; 
     const flow = await getFlowById(id);
     if (!connection || !flow) throw new Error("Flow ou conexão inválidos.");
 
-    // Update locally first for responsiveness
     Object.assign(flow, metadata);
     const updatedFlow = await updateFlow(flow);
 
-    // If synced with Meta, push changes
     if (updatedFlow.metaFlowId) {
         await updateFlowMetadataOnMeta(connection, updatedFlow.metaFlowId, metadata);
     }

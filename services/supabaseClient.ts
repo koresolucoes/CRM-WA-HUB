@@ -61,6 +61,7 @@ export interface Database {
           target: Json
           template_id: string
           total_count: number
+          user_id: string
         }
         Insert: {
           created_at?: string
@@ -75,6 +76,7 @@ export interface Database {
           target: Json
           template_id: string
           total_count: number
+          user_id: string
         }
         Update: {
           created_at?: string
@@ -89,6 +91,7 @@ export interface Database {
           target?: Json
           template_id?: string
           total_count?: number
+          user_id?: string
         }
       }
       contacts: {
@@ -218,6 +221,7 @@ export interface Database {
           name: string
           phone_number_id: string
           waba_id: string
+          user_id: string
         }
         Insert: {
           api_token: string
@@ -226,6 +230,7 @@ export interface Database {
           name: string
           phone_number_id: string
           waba_id: string
+          user_id: string
         }
         Update: {
           api_token?: string
@@ -234,6 +239,7 @@ export interface Database {
           name?: string
           phone_number_id?: string
           waba_id?: string
+          user_id?: string
         }
       }
       scheduled_automation_tasks: {

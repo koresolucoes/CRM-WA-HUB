@@ -19,14 +19,14 @@ type TestResult = {
     success: boolean | null;
 }
 
-const emptyConnection: Omit<MetaConnection, 'id'> = { name: '', wabaId: '', phoneNumberId: '', apiToken: '' };
+const emptyConnection: Omit<MetaConnection, 'id' | 'user_id'> = { name: '', wabaId: '', phoneNumberId: '', apiToken: '' };
 
 function SettingsPage(): React.ReactNode {
   const [connections, setConnections] = useState<MetaConnection[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingConnection, setEditingConnection] = useState<Omit<MetaConnection, 'id'> | MetaConnection>(emptyConnection);
+  const [editingConnection, setEditingConnection] = useState<Omit<MetaConnection, 'id' | 'user_id'> | MetaConnection>(emptyConnection);
   const [testResults, setTestResults] = useState<Record<string, TestResult>>({});
 
   const loadData = useCallback(async () => {

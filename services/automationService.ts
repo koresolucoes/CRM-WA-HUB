@@ -1,10 +1,9 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import type {
-    Automation, AutomationNode, TriggerCrmStageChangedData, TriggerTagAddedData, AutomationTriggerType, AutomationActionType,
-    Contact, Condition, ActionSendMessageData, ActionWaitData, ActionAddTagData, ActionRemoveTagData,
-    ActionMoveCrmStageData, ActionConditionalData, ActionHttpRequestData, ActionOptOutData, ActionRandomizerData, ActionForwardAutomationData, TriggerContextMessageData,
-    MessageTemplate,
+    Automation, AutomationNode, TriggerCrmStageChangedData, TriggerTagAddedData, AutomationTriggerType,
+    Contact, ActionSendMessageData, ActionWaitData, ActionAddTagData, ActionRemoveTagData,
+    ActionMoveCrmStageData, ActionConditionalData, ActionHttpRequestData, ActionForwardAutomationData, TriggerContextMessageData,
     AutomationActionData
 } from '../types';
 import { AutomationStatus } from '../types';
@@ -15,6 +14,7 @@ import { sendMessage as sendTemplateMessage, getMessageTemplates, getActiveConne
 import { getAllStages } from './crmService';
 
 export async function getAutomations(): Promise<Automation[]> {
+    // RLS handles filtering by user_id
     const { data, error } = await supabase.from('automations').select('*').order('created_at', { ascending: false });
     if (error) {
         console.error("Error fetching automations:", error);
@@ -24,7 +24,7 @@ export async function getAutomations(): Promise<Automation[]> {
         id: a.id,
         name: a.name,
         status: a.status as AutomationStatus,
-        nodes: a.nodes as AutomationNode[],
+        nodes: a.nodes as unknown as AutomationNode[],
         edges: a.edges as any,
         createdAt: a.created_at,
         allowReactivation: a.allow_reactivation,
@@ -34,6 +34,7 @@ export async function getAutomations(): Promise<Automation[]> {
 }
 
 export async function getAutomationById(id: string): Promise<Automation | undefined> {
+    // RLS handles filtering by user_id
     const { data, error } = await supabase.from('automations').select('*').eq('id', id).single();
     if (error) {
         if (error.code === 'PGRST116') return undefined;
@@ -44,7 +45,7 @@ export async function getAutomationById(id: string): Promise<Automation | undefi
         id: data.id,
         name: data.name,
         status: data.status as AutomationStatus,
-        nodes: data.nodes as AutomationNode[],
+        nodes: data.nodes as unknown as AutomationNode[],
         edges: data.edges as any,
         createdAt: data.created_at,
         allowReactivation: data.allow_reactivation,
@@ -59,8 +60,12 @@ export async function addAutomation(details: {
     allowReactivation: boolean;
     blockOnOpenChat: boolean;
 }): Promise<Automation> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Usuário não autenticado.");
+
     const newAutomationData = {
         id: uuidv4(),
+        user_id: user.id,
         name: details.name,
         status: details.status,
         nodes: [],
@@ -86,7 +91,7 @@ export async function addAutomation(details: {
         id: data.id,
         name: data.name,
         status: data.status as AutomationStatus,
-        nodes: data.nodes as AutomationNode[],
+        nodes: data.nodes as unknown as AutomationNode[],
         edges: data.edges as any,
         createdAt: data.created_at,
         allowReactivation: data.allow_reactivation,
@@ -97,6 +102,7 @@ export async function addAutomation(details: {
 
 export async function updateAutomation(updatedAutomation: Automation): Promise<void> {
     const { id, name, status, nodes, edges, allowReactivation, blockOnOpenChat, executionStats } = updatedAutomation;
+    // RLS protects this update
     const { error } = await supabase
         .from('automations')
         .update({ name, status, nodes: nodes as unknown as Json, edges: edges as unknown as Json, allow_reactivation: allowReactivation, block_on_open_chat: blockOnOpenChat, execution_stats: executionStats as unknown as Json })
@@ -111,6 +117,7 @@ export async function updateAutomation(updatedAutomation: Automation): Promise<v
 }
 
 export async function deleteAutomation(automationId: string): Promise<void> {
+    // RLS protects this deletion
     const { error } = await supabase.from('automations').delete().eq('id', automationId);
     if (error) {
         console.error("Error deleting automation:", error);
@@ -124,14 +131,6 @@ export async function deleteAutomation(automationId: string): Promise<void> {
 
 // --- Automation Engine ---
 
-/**
- * Replaces placeholders in a string with values from a context object.
- * E.g., "Hello {{contact.name}}" with context { contact: { name: 'John' } } -> "Hello John"
- * E.g., "Data: {{webhook.user.id}}" with context { webhook: { user: { id: 123 } } } -> "Data: 123"
- * @param template The string with placeholders.
- * @param context The object containing data.
- * @returns The interpolated string.
- */
 function interpolateString(template: string, context: any): string {
     if (!template) return '';
     return template.replace(/\{\{([^}]+)\}\}/g, (match, path) => {
@@ -141,7 +140,7 @@ function interpolateString(template: string, context: any): string {
             if (value && typeof value === 'object' && key in value) {
                 value = value[key];
             } else {
-                return match; // Path not found, return original placeholder
+                return match; 
             }
         }
         return value !== undefined && value !== null ? String(value) : match;
@@ -158,7 +157,6 @@ export async function executeAutomation(
 ) {
     console.log(`Executing automation "${automation.name}" for contact ${contact.name}...`);
     
-    // Make a mutable copy of the automation to update its stats
     const automationToExecute = JSON.parse(JSON.stringify(automation)) as Automation;
     if (!automationToExecute.executionStats) {
         automationToExecute.executionStats = {};
@@ -171,7 +169,6 @@ export async function executeAutomation(
         return;
     }
     
-    // The context object for variable interpolation
     const executionContext = {
         contact,
         ...initialContext
@@ -229,7 +226,7 @@ export async function executeAutomation(
                                 recipient: contact.phone,
                                 templateName: template.name,
                                 languageCode: template.language,
-                                components: [] // TODO: Add variable support
+                                components: [] 
                              });
                          } else {
                              console.error(`Template with ID ${smData.templateId} not found or not approved.`);
@@ -265,7 +262,7 @@ export async function executeAutomation(
                         }]);
                         stats[nodeId].success++;
                         await updateAutomation(automationToExecute);
-                        return; // EXIT the execution here.
+                        return;
                     }
                     break;
                 }
@@ -346,7 +343,6 @@ export async function executeAutomation(
                 }
             }
 
-            // --- Path Selection ---
             if (currentNode.subType === 'conditional') {
                 const condData = currentNode.data as ActionConditionalData;
                 let result = condData.logic === 'and'; 
@@ -464,7 +460,6 @@ export async function runAutomations(triggerType: AutomationTriggerType, context
     });
 
     for (const automation of automationsToRun) {
-        // Run automations sequentially to avoid race conditions on stat updates for the same contact
         await executeAutomation(automation, contact, context, connection);
     }
 }

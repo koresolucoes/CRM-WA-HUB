@@ -6,6 +6,7 @@ import { getContactById, getContacts } from './contactService';
 import { supabase } from './supabaseClient';
 
 export async function getConversations(): Promise<Conversation[]> {
+    // RLS filters by user_id
     const { data, error } = await supabase.from('conversations').select('*').order('updated_at', { ascending: false });
     if (error) {
         console.error("Error fetching conversations:", error);
@@ -19,6 +20,7 @@ export async function getConversations(): Promise<Conversation[]> {
 }
 
 export async function getConversationByContactId(contactId: number): Promise<Conversation | undefined> {
+    // RLS filters by user_id
     const { data, error } = await supabase.from('conversations').select('*').eq('contact_id', contactId).single();
     if (error) {
         if (error.code === 'PGRST116') return undefined; // No conversation yet
@@ -38,6 +40,7 @@ async function updateMessageStatus(messageId: string, contactId: number, status:
         const messageIndex = convo.messages.findIndex(m => m.id === messageId);
         if (messageIndex > -1) {
             convo.messages[messageIndex].status = status;
+            // RLS protects this update
             const { error } = await supabase
                 .from('conversations')
                 .update({ messages: convo.messages, updated_at: new Date().toISOString() })
@@ -51,6 +54,9 @@ async function updateMessageStatus(messageId: string, contactId: number, status:
 }
 
 export async function addMessage(contactId: number, message: Omit<ChatMessage, 'id' | 'timestamp'>): Promise<ChatMessage> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Usuário não autenticado.");
+
     let convo = await getConversationByContactId(contactId);
 
     const newMessage: ChatMessage = {
@@ -71,6 +77,7 @@ export async function addMessage(contactId: number, message: Omit<ChatMessage, '
         if (error) throw new Error(error.message);
     } else {
         const newConvo = {
+            user_id: user.id,
             contact_id: contactId,
             messages: [newMessage],
             unread_count: message.sender === 'contact' ? 1 : 0,

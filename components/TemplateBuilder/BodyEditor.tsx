@@ -1,10 +1,9 @@
-
-import React from 'react';
+import React, { useRef } from 'react';
 import type { BodyComponent } from '../../types';
 import { formFieldClasses } from '../ui/styleConstants';
 
 const BodyEditor = ({ component, onChange }: { component: BodyComponent, onChange: (newComponent: BodyComponent) => void }) => {
-    const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     const addVariable = () => {
         if (textareaRef.current) {

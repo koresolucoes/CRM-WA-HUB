@@ -11,11 +11,8 @@ const DEFAULT_STAGES = [
     { title: 'Vendido' },
 ];
 
-/**
- * Fetches all CRM boards (from funnels table) from the database.
- * @returns A promise that resolves to an array of CrmBoard objects.
- */
 export async function getBoards(): Promise<CrmBoard[]> {
+    // RLS filters by user_id
     const { data, error } = await supabase.from('funnels').select('*').order('created_at', { ascending: true });
     if (error) {
         console.error("Error fetching funnels (as boards):", error);
@@ -24,16 +21,12 @@ export async function getBoards(): Promise<CrmBoard[]> {
     return (data || []).map(f => ({
         id: f.id,
         name: f.name,
-        columns: f.columns || [] // Ensure columns is always an array
+        columns: f.columns || []
     }));
 }
 
-/**
- * Fetches a single board (from funnels table) by its ID.
- * @param id The ID of the board to fetch.
- * @returns A promise that resolves to a CrmBoard object or null if not found.
- */
 export async function getBoardById(id: string): Promise<CrmBoard | null> {
+    // RLS filters by user_id
     const { data, error } = await supabase.from('funnels').select('*').eq('id', id).single();
     if (error) {
         if (error.code === 'PGRST116') return null; // Row not found
@@ -43,13 +36,12 @@ export async function getBoardById(id: string): Promise<CrmBoard | null> {
     return data ? { id: data.id, name: data.name, columns: data.columns || [] } : null;
 }
 
-/**
- * Creates a new CRM board (in funnels table) with a default set of stages.
- * @param name The name for the new board.
- * @returns A promise that resolves to the newly created CrmBoard object.
- */
 export async function createBoard(name: string): Promise<CrmBoard> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Usuário não autenticado.");
+
     const newBoardData = {
+        user_id: user.id,
         name: name || 'Novo Funil',
         columns: DEFAULT_STAGES.map(col => ({
             id: uuidv4(),
@@ -68,27 +60,22 @@ export async function createBoard(name: string): Promise<CrmBoard> {
     return data as CrmBoard;
 }
 
-/**
- * Creates a new CRM board from a raw CrmBoard object, used for draft saving.
- * @param board The full board object to insert.
- * @returns A promise that resolves to the created board data from the DB.
- */
-export async function createRawBoard(board: CrmBoard): Promise<CrmBoard> {
-    const { data, error } = await supabase.from('funnels').insert([board]).select().single();
+export async function createRawBoard(board: Omit<CrmBoard, 'id'> & { id?: string }): Promise<CrmBoard> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Usuário não autenticado.");
+
+    const boardWithUser = { ...board, user_id: user.id };
+    const { data, error } = await supabase.from('funnels').insert([boardWithUser]).select().single();
     if (error) {
         console.error("Error creating raw funnel (as board):", error);
         throw new Error(`Falha ao criar board (funnel): ${error.message}`);
     }
-    // No event dispatch here; the calling function will handle it after all promises resolve.
     return data as CrmBoard;
 }
 
-/**
- * Updates an existing board's data (in funnels table).
- * @param board The complete CrmBoard object with updated data.
- */
 export async function updateBoard(board: CrmBoard): Promise<void> {
     const { id, ...updateData } = board;
+    // RLS protects this update
     const { error } = await supabase.from('funnels').update(updateData).eq('id', id);
     if (error) {
         console.error("Error updating funnel (as board):", error);
@@ -99,11 +86,8 @@ export async function updateBoard(board: CrmBoard): Promise<void> {
     }
 }
 
-/**
- * Deletes a board (from funnels table) from the database.
- * @param boardId The ID of the board to delete.
- */
 export async function deleteBoard(boardId: string): Promise<void> {
+    // RLS protects this deletion
     const { error } = await supabase.from('funnels').delete().eq('id', boardId);
     if (error) {
         console.error("Error deleting funnel (as board):", error);
@@ -114,11 +98,6 @@ export async function deleteBoard(boardId: string): Promise<void> {
     }
 }
 
-/**
- * A helper function to get all stages from all boards.
- * This is useful for finding a stage's title by its ID across the entire system.
- * @returns A promise that resolves to an array of all CRM stage objects.
- */
 export async function getAllStages(): Promise<Omit<CrmStage, 'cards'>[]> {
     const boards = await getBoards();
     return boards.flatMap(board => board.columns);

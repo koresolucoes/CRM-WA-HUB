@@ -8,13 +8,14 @@ import { supabase } from './supabaseClient';
 
 export interface MetaConnection {
   id: string;
+  user_id: string;
   name: string;
   wabaId: string;
   phoneNumberId: string;
   apiToken: string;
 }
 
-const ACTIVE_META_CONNECTION_ID_KEY = 'activeMetaConnectionId';
+const ACTIVE_META_CONNECTION_ID_KEY_PREFIX = 'activeMetaConnectionId_';
 const API_VERSION = 'v19.0';
 const BASE_URL = `https://graph.facebook.com/${API_VERSION}`;
 
@@ -96,14 +97,18 @@ function handleMetaApiError(errorData: any, defaultMessage: string): Error {
 
 
 export async function getConnections(): Promise<MetaConnection[]> {
-  const { data, error } = await supabase.from('meta_connections').select('*');
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data, error } = await supabase.from('meta_connections').select('*').eq('user_id', user.id);
+  
   if (error) {
     console.error("Error fetching connections from Supabase:", error);
     throw new Error(error.message);
   }
-  // Map snake_case from DB to camelCase for the app
   return (data || []).map(c => ({
     id: c.id,
+    user_id: c.user_id,
     name: c.name,
     wabaId: c.waba_id,
     phoneNumberId: c.phone_number_id,
@@ -112,7 +117,10 @@ export async function getConnections(): Promise<MetaConnection[]> {
 }
 
 export async function getConnectionById(id: string): Promise<MetaConnection | null> {
-    const { data, error } = await supabase.from('meta_connections').select('*').eq('id', id).single();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+
+    const { data, error } = await supabase.from('meta_connections').select('*').eq('id', id).eq('user_id', user.id).single();
     if (error) {
         if (error.code === 'PGRST116') return null; // Not found is not an error here
         console.error(`Error fetching connection by ID ${id}:`, error);
@@ -120,6 +128,7 @@ export async function getConnectionById(id: string): Promise<MetaConnection | nu
     }
     return data ? {
         id: data.id,
+        user_id: data.user_id,
         name: data.name,
         wabaId: data.waba_id,
         phoneNumberId: data.phone_number_id,
@@ -127,8 +136,12 @@ export async function getConnectionById(id: string): Promise<MetaConnection | nu
     } : null;
 }
 
-export async function saveConnection(connection: Omit<MetaConnection, 'id'> | MetaConnection): Promise<void> {
+export async function saveConnection(connection: Omit<MetaConnection, 'id' | 'user_id'> | MetaConnection): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Usuário não autenticado.");
+
     const connectionData = {
+        user_id: user.id,
         name: connection.name,
         waba_id: connection.wabaId,
         phone_number_id: connection.phoneNumberId,
@@ -136,29 +149,19 @@ export async function saveConnection(connection: Omit<MetaConnection, 'id'> | Me
     };
     
     if ('id' in connection && connection.id) {
-        // Update existing connection
-        const { error } = await supabase.from('meta_connections').update(connectionData).eq('id', connection.id);
+        const { error } = await supabase.from('meta_connections').update(connectionData).eq('id', connection.id).eq('user_id', user.id);
         if (error) throw new Error(error.message);
     } else {
-        // Create new connection
         const { error } = await supabase.from('meta_connections').insert([connectionData]);
         if (error) throw new Error(error.message);
     }
 }
 
 export async function deleteConnection(id: string): Promise<void> {
-    // First, delete any pending scheduled tasks associated with this connection to avoid foreign key violations.
-    const { error: scheduledTasksError } = await supabase
-        .from('scheduled_automation_tasks')
-        .delete()
-        .eq('meta_connection_id', id);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Usuário não autenticado.");
 
-    if (scheduledTasksError) {
-        console.error("Error deleting scheduled tasks for connection:", scheduledTasksError);
-        throw new Error(`Não foi possível apagar as tarefas agendadas associadas: ${scheduledTasksError.message}`);
-    }
-
-    // Now, delete the connection itself.
+    // The RLS policy will ensure a user can only delete their own connections.
     const { error } = await supabase.from('meta_connections').delete().eq('id', id);
     if (error) {
         console.error("Error deleting connection:", error);
@@ -168,7 +171,10 @@ export async function deleteConnection(id: string): Promise<void> {
     const activeId = getActiveConnectionId();
     if (activeId === id) {
         if (typeof window !== 'undefined') {
-            localStorage.removeItem(ACTIVE_META_CONNECTION_ID_KEY);
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+              localStorage.removeItem(`${ACTIVE_META_CONNECTION_ID_KEY_PREFIX}${user.id}`);
+            }
         }
     }
 }
@@ -176,26 +182,36 @@ export async function deleteConnection(id: string): Promise<void> {
 export async function getActiveConnection(): Promise<MetaConnection | null> {
   const activeId = getActiveConnectionId();
   if (!activeId) return null;
+  // This will only fetch connections for the logged-in user due to RLS.
   const connections = await getConnections();
   return connections.find(c => c.id === activeId) || null;
 }
 
 export function getActiveConnectionId(): string | null {
     if (typeof window !== 'undefined' && window.localStorage) {
-        return localStorage.getItem(ACTIVE_META_CONNECTION_ID_KEY);
+        const { data: { user } } = supabase.auth.getUser();
+        if (user) {
+          return localStorage.getItem(`${ACTIVE_META_CONNECTION_ID_KEY_PREFIX}${user.id}`);
+        }
     }
     return null;
 }
 
 export function setActiveConnectionId(id: string): void {
     if (typeof window !== 'undefined' && window.localStorage) {
-        localStorage.setItem(ACTIVE_META_CONNECTION_ID_KEY, id);
+        const { data: { user } } = supabase.auth.getUser();
+        if (user) {
+          localStorage.setItem(`${ACTIVE_META_CONNECTION_ID_KEY_PREFIX}${user.id}`, id);
+        }
     }
 }
 
 export function disconnectActiveConnection(): void {
     if (typeof window !== 'undefined' && window.localStorage) {
-        localStorage.removeItem(ACTIVE_META_CONNECTION_ID_KEY);
+        const { data: { user } } = supabase.auth.getUser();
+        if (user) {
+          localStorage.removeItem(`${ACTIVE_META_CONNECTION_ID_KEY_PREFIX}${user.id}`);
+        }
     }
 }
 
@@ -209,6 +225,10 @@ export async function testConnection(connection: MetaConnection): Promise<{ succ
         return { success: false, message: errorMessage };
     }
 }
+
+// ... the rest of the file remains largely the same, as it depends on a `connection` object being passed in.
+// No other function in this file needs direct knowledge of the user_id, as the higher-level logic will
+// provide the correct connection object which was already filtered by user.
 
 export async function getMessageTemplates(connection: MetaConnection): Promise<MessageTemplate[]> {
     if (!connection) throw new Error("Nenhuma conexão ativa.");
@@ -247,30 +267,20 @@ export async function getMessageTemplates(connection: MetaConnection): Promise<M
     }
 }
 
-/**
- * Transforms a local MessageTemplate object into the format required by the Meta API.
- * @param template The local MessageTemplate object.
- * @returns An API-compliant object.
- */
 function transformTemplateForApi(template: MessageTemplate): any {
     const apiComponents = template.components.map(component => {
-        // Deep copy component to avoid modifying the original state
         const apiComponent = JSON.parse(JSON.stringify(component));
-
-        // The API does not want the 'id' field we use locally for keys
         if (apiComponent.buttons) {
             apiComponent.buttons = apiComponent.buttons.map((button: Button & { id?: string }) => {
-                delete button.id; // Remove local-only ID
+                delete button.id;
                 return button;
             });
         }
-        // Remove empty 'example' objects as the API rejects them
         if (apiComponent.example && Object.keys(apiComponent.example).length === 0) {
             delete apiComponent.example;
         }
         return apiComponent;
     }).filter(c => {
-        // Filter out empty BUTTONS components, which are invalid for the API
         if (c.type === 'BUTTONS' && (!c.buttons || c.buttons.length === 0)) {
             return false;
         }
@@ -278,20 +288,13 @@ function transformTemplateForApi(template: MessageTemplate): any {
     });
 
     return {
-        name: template.name.toLowerCase().replace(/\s+/g, '_'), // Enforce snake_case
+        name: template.name.toLowerCase().replace(/\s+/g, '_'),
         language: template.language,
         category: template.category,
         components: apiComponents,
     };
 }
 
-
-/**
- * Creates a new message template via the Meta API.
- * @param connection The active Meta connection.
- * @param template The local MessageTemplate object to create.
- * @returns A promise that resolves with the ID of the created template.
- */
 export async function createMessageTemplate(connection: MetaConnection, template: MessageTemplate): Promise<{ id: string }> {
   if (!connection) throw new Error("Nenhuma conexão ativa.");
 
@@ -326,7 +329,6 @@ export async function createMessageTemplate(connection: MetaConnection, template
     throw new Error('Ocorreu um erro de rede ao criar o modelo.');
   }
 }
-
 
 interface SendMessagePayload {
     recipient: string;
@@ -376,7 +378,6 @@ export async function sendMessage(connection: MetaConnection, payload: SendMessa
         throw new Error('Ocorreu um erro de rede ao enviar mensagem.');
     }
 }
-
 
 export async function sendTextMessage(connection: MetaConnection, recipient: string, text: string): Promise<any> {
     if (!connection) throw new Error("Nenhuma conexão ativa.");
@@ -429,7 +430,6 @@ export async function sendFlowMessage(connection: MetaConnection, recipient: str
         flow_id: flowData.flowId,
         flow_cta: "Abrir Flow",
         flow_action: "navigate",
-        // flow_action_payload can be added here if needed
       }
     };
 
@@ -441,13 +441,13 @@ export async function sendFlowMessage(connection: MetaConnection, recipient: str
             type: "flow",
             header: {
                 type: "text",
-                text: "Título do Flow" // Customize as needed
+                text: "Título do Flow"
             },
             body: {
-                text: "Clique para iniciar a experiência interativa." // Customize
+                text: "Clique para iniciar a experiência interativa."
             },
             footer: {
-                text: "Desenvolvido por nossa plataforma" // Customize
+                text: "Desenvolvido por nossa plataforma"
             },
             action: flowPayload
         }
@@ -557,7 +557,7 @@ export async function createFlowOnMeta(
     const url = `${BASE_URL}/${connection.wabaId}/flows`;
     const body = {
         name: flow.name,
-        categories: ['LEAD_GENERATION'], // API requires at least one category.
+        categories: ['LEAD_GENERATION'], 
         flow_json: generateFlowJsonForApi(flow),
         publish,
         ...(flow.endpointUri && { endpoint_uri: flow.endpointUri }),
@@ -687,7 +687,6 @@ export async function getWhatsAppFlows(connection: MetaConnection): Promise<Part
 export async function getFlowJsonContent(connection: MetaConnection, flowId: string): Promise<any> {
     if (!connection) throw new Error("Nenhuma conexão ativa.");
 
-    // Step 1: Fetch the list of assets for the flow to get the download URL
     const assetsUrl = `${BASE_URL}/${flowId}/assets`;
     const assetsResponse = await fetchWithTimeout(assetsUrl, {
         headers: { 'Authorization': `Bearer ${connection.apiToken}` }
@@ -700,13 +699,9 @@ export async function getFlowJsonContent(connection: MetaConnection, flowId: str
 
     const flowJsonAsset = assetsData.data?.find((asset: any) => asset.asset_type === 'FLOW_JSON');
 
-    // If no asset is found, it's likely a new flow with no content yet.
     if (!flowJsonAsset || !flowJsonAsset.download_url) {
-        // If Meta has no JSON asset, it's an empty flow.
-        // Return a default structure with one screen (mimicking Meta's format) 
-        // to prevent an infinite fetch loop in the builder.
         const defaultApiScreen = {
-            id: 'WELCOME_SCREEN', // This is what Meta expects as the screen identifier
+            id: 'WELCOME_SCREEN',
             layout: { type: 'SingleColumnLayout', children: [] }
         };
         return { 
@@ -719,7 +714,6 @@ export async function getFlowJsonContent(connection: MetaConnection, flowId: str
 
     const downloadUrl = flowJsonAsset.download_url;
     
-    // Step 2: Use the dedicated download proxy to fetch the content from the URL
     const downloadProxyUrl = '/api/download-asset';
     
     try {
@@ -759,7 +753,6 @@ export async function deleteFlowFromMeta(connection: MetaConnection, flowId: str
 
         const data = await response.json();
 
-        // The API returns { "success": true } on a 200 OK.
         if (!response.ok || !data.success) {
             throw handleMetaApiError(data, `Falha ao excluir o flow ${flowId} da Meta.`);
         }

@@ -4,12 +4,15 @@ import { Link } from 'react-router-dom';
 import { BellIcon, SettingsIcon, ArrowLeftOnRectangleIcon } from './icons';
 import { getActiveConnection, getConnections, setActiveConnectionId, disconnectActiveConnection, type MetaConnection } from '../services/metaService';
 import { searchService } from '../services/searchService';
+import { signOut } from '../services/authService';
+import { supabase } from '../services/supabaseClient';
 
 function Header(): React.ReactNode {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [activeConnection, setActiveConnection] = useState<MetaConnection | null>(null);
   const [allConnections, setAllConnections] = useState<MetaConnection[]>([]);
   const [searchValue, setSearchValue] = useState('');
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const profileRef = useRef<HTMLDivElement>(null);
 
   const updateConnectionState = async () => {
@@ -20,6 +23,10 @@ function Header(): React.ReactNode {
   };
   
   useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+        setUserEmail(user?.email || null);
+    });
+
     updateConnectionState();
 
     // Subscribe to connection changes
@@ -65,9 +72,14 @@ function Header(): React.ReactNode {
     searchService.setSearchTerm(term);
   };
 
-  const userName = activeConnection?.name || "Nenhuma Conexão";
-  const userRole = activeConnection ? `Ativa` : "Desconectado";
-  const avatarUrl = activeConnection ? `https://i.pravatar.cc/100?u=${activeConnection.id}` : "https://avatar.iran.liara.run/public/9";
+  const handleSignOut = async () => {
+      await signOut();
+      // The App component will handle the redirection.
+  };
+
+  const userName = activeConnection?.name || userEmail || "Usuário";
+  const userRole = activeConnection ? `Conexão Ativa` : (userEmail ? "Conectado" : "Desconectado");
+  const avatarUrl = activeConnection ? `https://i.pravatar.cc/100?u=${activeConnection.id}` : (userEmail ? `https://i.pravatar.cc/100?u=${userEmail}` : "https://avatar.iran.liara.run/public/9");
 
 
   return (
@@ -115,8 +127,8 @@ function Header(): React.ReactNode {
             {isProfileOpen && (
               <div className="absolute right-0 mt-2 w-64 bg-white rounded-md shadow-lg py-1 z-20 ring-1 ring-black ring-opacity-5">
                 <div className="px-4 py-3 border-b border-gray-100">
-                  <p className="text-sm font-semibold text-gray-800">{userName}</p>
-                  <p className="text-sm text-gray-500 truncate">{activeConnection ? `WABA: ${activeConnection.wabaId}` : 'Nenhuma conta ativa'}</p>
+                  <p className="text-sm font-semibold text-gray-800">{userEmail}</p>
+                  <p className="text-sm text-gray-500 truncate">{activeConnection ? `Ativa: ${activeConnection.name}` : 'Nenhuma conexão ativa'}</p>
                 </div>
                 
                 <div className="border-t border-gray-100">
@@ -142,10 +154,19 @@ function Header(): React.ReactNode {
                   <SettingsIcon className="w-5 h-5 mr-3 text-gray-500"/>
                   Gerenciar Conexões
                 </Link>
+                {activeConnection && (
+                    <>
+                        <div className="border-t border-gray-100"></div>
+                        <button onClick={handleDisconnect} className="flex items-center w-full text-left px-4 py-2 text-sm text-amber-700 hover:bg-amber-50">
+                            <ArrowLeftOnRectangleIcon className="w-5 h-5 mr-3 text-amber-500"/>
+                            Desconectar Conta Ativa
+                        </button>
+                    </>
+                )}
                 <div className="border-t border-gray-100"></div>
-                <button onClick={handleDisconnect} className="flex items-center w-full text-left px-4 py-2 text-sm text-amber-700 hover:bg-amber-50">
-                    <ArrowLeftOnRectangleIcon className="w-5 h-5 mr-3 text-amber-500"/>
-                    Desconectar
+                 <button onClick={handleSignOut} className="flex items-center w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50">
+                    <ArrowLeftOnRectangleIcon className="w-5 h-5 mr-3 text-red-500"/>
+                    Sair
                 </button>
               </div>
             )}

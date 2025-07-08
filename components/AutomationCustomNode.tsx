@@ -1,19 +1,20 @@
 
 
-
-
 import React, { memo, useMemo } from 'react';
-import { Handle, Position, NodeProps } from 'reactflow';
+import { Handle, Position } from 'reactflow';
+import type { NodeProps } from 'reactflow';
 import type { AutomationNode, ActionRandomizerData, TriggerTagAddedData, ActionSendMessageData, ActionWaitData, ActionAddTagData, ActionRemoveTagData, TriggerCrmStageChangedData, TriggerContextMessageData, ActionMoveCrmStageData, ActionForwardAutomationData, CrmBoard, TriggerWebhookData } from '../types';
 import { TRIGGER_OPTIONS, ACTION_OPTIONS, NODE_ICONS } from '../services/automationUtils';
-import { CheckCircleIcon, XCircleIcon } from '../components/icons';
+import { CheckCircleIcon, XCircleIcon, iconMap } from '../components/icons';
 
 
 export const AutomationCustomNode = memo(({ id, data, selected }: NodeProps<{ node: AutomationNode, inspectorData: any, stats: { total: number, success: number, error: number } }>) => {
     const { node, inspectorData, stats } = data;
     const isTrigger = node.type === 'trigger';
     const title = [...TRIGGER_OPTIONS, ...ACTION_OPTIONS].find(opt => opt.value === node.subType)?.label || 'Nó Desconhecido';
-    const icon = NODE_ICONS[node.subType];
+    
+    const iconName = NODE_ICONS[node.subType];
+    const IconComponent = iconName ? iconMap[iconName as keyof typeof iconMap] : null;
 
     const getNodeDescription = (node: AutomationNode) => {
         const data = node.data;
@@ -83,7 +84,9 @@ export const AutomationCustomNode = memo(({ id, data, selected }: NodeProps<{ no
         <div className={`bg-white rounded-lg shadow-md border-2 min-w-[240px] max-w-xs ${selected ? 'border-amber-500 shadow-amber-200' : 'border-gray-200'}`}>
             {!isTrigger && <Handle type="target" position={Position.Top} className="!w-3 !h-3 !bg-amber-500" />}
             <div className="p-3 flex items-start space-x-3">
-                <div className="flex-shrink-0 pt-1">{icon}</div>
+                <div className="flex-shrink-0 pt-1">
+                    {IconComponent && <IconComponent className="w-5 h-5" />}
+                </div>
                 <div className="flex-grow min-w-0">
                     <p className="font-bold text-gray-800">{title}</p>
                     <p className="text-xs text-gray-500 break-words">{getNodeDescription(node)}</p>

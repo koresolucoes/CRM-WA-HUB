@@ -1,6 +1,8 @@
 
+
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useNodesState, useEdgesState, Connection, Node, MarkerType } from 'reactflow';
+import { useNodesState, useEdgesState, MarkerType } from 'reactflow';
+import type { Connection, Node } from 'reactflow';
 import { v4 as uuidv4 } from 'uuid';
 import type { Automation, AutomationNode, AutomationData, AutomationTriggerType, AutomationActionType } from '../types';
 import { updateAutomation } from './automationService';

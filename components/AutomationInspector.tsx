@@ -1,7 +1,6 @@
 
-
 import React, { useState, useEffect, useRef } from 'react';
-import { Node as ReactFlowNode } from 'reactflow';
+import type { Node as ReactFlowNode } from 'reactflow';
 import type { Automation, AutomationNode, AutomationData, MessageTemplate, WhatsAppFlow, ActionSendMessageData, ActionWaitData, ActionAddTagData, TriggerTagAddedData, ActionConditionalData, Condition, TagCondition, FieldCondition, WindowCondition, BusinessHoursCondition, ActionRandomizerData, ActionMoveCrmStageData, ActionHttpRequestData, HttpHeader, ActionForwardAutomationData, TriggerCrmStageChangedData, TriggerContextMessageData, AutomationTriggerType, AutomationActionType, CrmBoard, TriggerWebhookData } from '../types';
 import { TRIGGER_OPTIONS, ACTION_OPTIONS } from '../services/automationUtils';
 import { getAutomationById } from '../services/automationService';
@@ -19,6 +18,134 @@ const InspectorField = ({ label, children, helpText }: { label: string, children
         {helpText && <p className="text-xs text-gray-500 mt-1">{helpText}</p>}
     </div>
 );
+
+// New component for the Webhook inspector to correctly scope hooks
+const WebhookInspectorDetails = ({ node, automation, update }: {
+    node: AutomationNode;
+    automation: Automation;
+    update: (data: Partial<AutomationData>, replace?: boolean) => void;
+}) => {
+    const webhookData = node.data as TriggerWebhookData;
+    const webhookUrl = `${window.location.origin}/api/execute-automation-webhook?id=${webhookData.webhookId}`;
+    
+    const [countdown, setCountdown] = useState(0);
+    const isMounted = useRef(true);
+
+    useEffect(() => {
+        isMounted.current = true;
+        return () => { isMounted.current = false; };
+    }, []);
+
+    useEffect(() => {
+        if (!webhookData.isListening) {
+            setCountdown(0);
+            return;
+        }
+    
+        setCountdown(60);
+    
+        const pollInterval = setInterval(async () => {
+            try {
+                const freshAutomation = await getAutomationById(automation.id);
+                if (!isMounted.current || !freshAutomation) return;
+                const freshWebhookNode = freshAutomation.nodes.find(n => n.id === node.id);
+                if (freshWebhookNode && (freshWebhookNode.data as TriggerWebhookData).lastSample) {
+                    update((freshWebhookNode.data as TriggerWebhookData), true);
+                }
+            } catch (error) {
+                console.error("Polling for webhook sample failed:", error);
+            }
+        }, 3000);
+    
+        const countdownInterval = setInterval(() => {
+            setCountdown(prev => {
+                if (prev <= 1) {
+                    clearInterval(pollInterval);
+                    clearInterval(countdownInterval);
+                    if (isMounted.current) {
+                        getAutomationById(automation.id).then(freshAutomation => {
+                            if (!isMounted.current || !freshAutomation) return;
+                            const freshWebhookNode = freshAutomation.nodes.find(n => n.id === node.id);
+                            if (!freshWebhookNode || !(freshWebhookNode.data as TriggerWebhookData).lastSample) {
+                               if (isMounted.current) update({ isListening: false });
+                            } else {
+                               if (isMounted.current) update((freshWebhookNode.data as TriggerWebhookData), true);
+                            }
+                        });
+                    }
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+    
+        return () => {
+            clearInterval(pollInterval);
+            clearInterval(countdownInterval);
+        };
+    
+    }, [webhookData.isListening, automation.id, node.id, update]);
+    
+    const handleListen = () => update({ isListening: true, lastSample: null });
+    const clearSample = () => update({ lastSample: null });
+
+    const copyToClipboard = () => {
+        navigator.clipboard.writeText(webhookUrl);
+        alert('URL copiada para a área de transferência!');
+    };
+    
+    const parseVariables = (obj: any, prefix = 'webhook'): string[] => {
+        let vars: string[] = [];
+        for (const key in obj) {
+            if (obj.hasOwnProperty(key)) {
+                const newPrefix = `${prefix}.${key}`;
+                if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
+                    vars = vars.concat(parseVariables(obj[key], newPrefix));
+                } else {
+                    vars.push(`{{${newPrefix}}}`);
+                }
+            }
+        }
+        return vars;
+    };
+
+    const availableVariables = webhookData.lastSample ? parseVariables(webhookData.lastSample) : [];
+
+    return (
+        <div className="space-y-4">
+            <InspectorField label="URL do Webhook (POST)">
+                 <div className="flex items-center space-x-2">
+                    <input type="text" value={webhookUrl} readOnly className={`${formFieldClasses} font-mono`} />
+                    <button onClick={copyToClipboard} className="bg-gray-200 hover:bg-gray-300 p-2 rounded-md">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                    </button>
+                </div>
+            </InspectorField>
+            
+            <div className="p-3 bg-gray-50 border rounded-lg">
+                <h4 className="font-semibold text-sm">Testar Gatilho</h4>
+                <p className="text-xs text-gray-500 mb-3">Envie uma requisição POST para a URL acima para capturar uma amostra dos dados.</p>
+                <button onClick={handleListen} disabled={webhookData.isListening} className="w-full bg-amber-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-amber-600 transition disabled:opacity-50">
+                    {webhookData.isListening ? `Ouvindo... (${countdown}s)` : 'Ouvir para capturar dados'}
+                </button>
+            </div>
+
+            {webhookData.lastSample && (
+                <div className="space-y-3">
+                    <InspectorField label="Última Amostra Recebida">
+                        <pre className="text-xs bg-gray-900 text-white p-3 rounded-md max-h-48 overflow-auto font-mono">{JSON.stringify(webhookData.lastSample, null, 2)}</pre>
+                         <button onClick={clearSample} className="text-xs text-red-500 hover:underline mt-1">Limpar amostra</button>
+                    </InspectorField>
+                    <InspectorField label="Variáveis Disponíveis">
+                        <div className="p-2 border rounded-md bg-gray-50 max-h-40 overflow-y-auto">
+                            {availableVariables.map(v => <p key={v} className="text-xs font-mono">{v}</p>)}
+                        </div>
+                    </InspectorField>
+                </div>
+            )}
+        </div>
+    );
+};
 
 interface AutomationInspectorProps {
     selectedNode: ReactFlowNode<any> | null;
@@ -62,136 +189,7 @@ export const AutomationInspector = ({ selectedNode, automation, inspectorData, u
     const renderInspectorContent = () => {
         switch(node.subType) {
             case 'webhook': {
-                const webhookData = node.data as TriggerWebhookData;
-                const webhookUrl = `${window.location.origin}/api/execute-automation-webhook?id=${webhookData.webhookId}`;
-                
-                const [countdown, setCountdown] = useState(0);
-                const isMounted = useRef(true);
-
-                useEffect(() => {
-                    isMounted.current = true;
-                    return () => { isMounted.current = false; };
-                }, []);
-                
-                // Polling and Countdown Effect
-                useEffect(() => {
-                    if (!webhookData.isListening) {
-                        setCountdown(0);
-                        return; // Stop if not listening
-                    }
-                
-                    // Set initial countdown
-                    setCountdown(60);
-                
-                    const pollInterval = setInterval(async () => {
-                        try {
-                            const freshAutomation = await getAutomationById(automation.id);
-                            if (!isMounted.current || !freshAutomation) return;
-                            const freshWebhookNode = freshAutomation.nodes.find(n => n.id === node.id);
-                            // Check if the sample has been captured by the backend
-                            if (freshWebhookNode && (freshWebhookNode.data as TriggerWebhookData).lastSample) {
-                                update((freshWebhookNode.data as TriggerWebhookData), true); // Replace data, which includes isListening: false
-                            }
-                        } catch (error) {
-                            console.error("Polling for webhook sample failed:", error);
-                        }
-                    }, 3000); // Poll every 3 seconds
-                
-                    const countdownInterval = setInterval(() => {
-                        setCountdown(prev => {
-                            if (prev <= 1) {
-                                // Time's up
-                                clearInterval(pollInterval);
-                                clearInterval(countdownInterval);
-                                if (isMounted.current) {
-                                    // Check one last time before timing out
-                                    getAutomationById(automation.id).then(freshAutomation => {
-                                        if (!isMounted.current || !freshAutomation) return;
-                                        const freshWebhookNode = freshAutomation.nodes.find(n => n.id === node.id);
-                                        if (!freshWebhookNode || !(freshWebhookNode.data as TriggerWebhookData).lastSample) {
-                                           // if still no sample, then timeout
-                                           if (isMounted.current) update({ isListening: false });
-                                        } else {
-                                           // if sample arrived at last second
-                                           if (isMounted.current) update((freshWebhookNode.data as TriggerWebhookData), true);
-                                        }
-                                    });
-                                }
-                                return 0;
-                            }
-                            return prev - 1;
-                        });
-                    }, 1000);
-                
-                    // Cleanup function
-                    return () => {
-                        clearInterval(pollInterval);
-                        clearInterval(countdownInterval);
-                    };
-                
-                }, [webhookData.isListening, automation.id, node.id, update]);
-                
-                const handleListen = () => {
-                    update({ isListening: true, lastSample: null });
-                };
-                const clearSample = () => update({ lastSample: null });
-
-                const copyToClipboard = () => {
-                    navigator.clipboard.writeText(webhookUrl);
-                    alert('URL copiada para a área de transferência!');
-                };
-                
-                const parseVariables = (obj: any, prefix = 'webhook'): string[] => {
-                    let vars: string[] = [];
-                    for (const key in obj) {
-                        if (obj.hasOwnProperty(key)) {
-                            const newPrefix = `${prefix}.${key}`;
-                            if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
-                                vars = vars.concat(parseVariables(obj[key], newPrefix));
-                            } else {
-                                vars.push(`{{${newPrefix}}}`);
-                            }
-                        }
-                    }
-                    return vars;
-                };
-
-                const availableVariables = webhookData.lastSample ? parseVariables(webhookData.lastSample) : [];
-
-                return (
-                    <div className="space-y-4">
-                        <InspectorField label="URL do Webhook (POST)">
-                             <div className="flex items-center space-x-2">
-                                <input type="text" value={webhookUrl} readOnly className={`${formFieldClasses} font-mono`} />
-                                <button onClick={copyToClipboard} className="bg-gray-200 hover:bg-gray-300 p-2 rounded-md">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                                </button>
-                            </div>
-                        </InspectorField>
-                        
-                        <div className="p-3 bg-gray-50 border rounded-lg">
-                            <h4 className="font-semibold text-sm">Testar Gatilho</h4>
-                            <p className="text-xs text-gray-500 mb-3">Envie uma requisição POST para a URL acima para capturar uma amostra dos dados.</p>
-                            <button onClick={handleListen} disabled={webhookData.isListening} className="w-full bg-amber-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-amber-600 transition disabled:opacity-50">
-                                {webhookData.isListening ? `Ouvindo... (${countdown}s)` : 'Ouvir para capturar dados'}
-                            </button>
-                        </div>
-
-                        {webhookData.lastSample && (
-                            <div className="space-y-3">
-                                <InspectorField label="Última Amostra Recebida">
-                                    <pre className="text-xs bg-gray-900 text-white p-3 rounded-md max-h-48 overflow-auto font-mono">{JSON.stringify(webhookData.lastSample, null, 2)}</pre>
-                                     <button onClick={clearSample} className="text-xs text-red-500 hover:underline mt-1">Limpar amostra</button>
-                                </InspectorField>
-                                <InspectorField label="Variáveis Disponíveis">
-                                    <div className="p-2 border rounded-md bg-gray-50 max-h-40 overflow-y-auto">
-                                        {availableVariables.map(v => <p key={v} className="text-xs font-mono">{v}</p>)}
-                                    </div>
-                                </InspectorField>
-                            </div>
-                        )}
-                    </div>
-                );
+                return <WebhookInspectorDetails node={node} automation={automation} update={update} />;
             }
             case 'tag_added': {
                 const tagData = node.data as TriggerTagAddedData;

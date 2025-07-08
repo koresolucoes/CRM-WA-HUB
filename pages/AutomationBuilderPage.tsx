@@ -8,8 +8,8 @@ import ReactFlow, {
     Controls,
     Background,
     BackgroundVariant,
-    Node as ReactFlowNode,
 } from 'reactflow';
+import type { Node as ReactFlowNode } from 'reactflow';
 import { AutomationInspector } from '../components/AutomationInspector';
 import { AutomationToolbox } from '../components/AutomationToolbox';
 import { AutomationCustomNode } from '../components/AutomationCustomNode';

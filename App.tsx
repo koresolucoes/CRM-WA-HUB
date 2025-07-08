@@ -1,6 +1,6 @@
 
-import React from 'react';
-import { HashRouter, Routes, Route, useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { HashRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import DashboardPage from './pages/DashboardPage';
@@ -16,8 +16,11 @@ import ChatPage from './pages/ChatPage';
 import AutomationsPage from './pages/AutomationsPage';
 import AutomationBuilderPage from './pages/AutomationBuilderPage';
 import TemplateBuilderPage from './pages/TemplateBuilderPage';
+import AuthPage from './pages/AuthPage';
 import { addFlow } from './services/flowService';
 import { addTemplate } from './services/templateService';
+import { supabase } from './services/supabaseClient';
+import type { Session, User } from '@supabase/supabase-js';
 
 const MainLayout = ({ children }: { children: React.ReactNode }) => (
   <div className="flex h-screen bg-gray-50">
@@ -31,18 +34,17 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => (
   </div>
 );
 
-// This component handles the redirection for a new flow.
 const NewFlowRedirector: React.FC = () => {
     const navigate = useNavigate();
     React.useEffect(() => {
         const createAndRedirect = async () => {
             try {
-                const newFlow = await addFlow(); // addFlow is now async
+                const newFlow = await addFlow();
                 navigate(`/flows/${newFlow.id}`, { replace: true });
             } catch (error) {
                 console.error("Failed to create new flow:", error);
                 alert(`Não foi possível criar o novo flow: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
-                navigate('/flows', { replace: true }); // Redirect back to the list on failure
+                navigate('/flows', { replace: true });
             }
         };
         createAndRedirect();
@@ -68,11 +70,8 @@ const NewTemplateRedirector: React.FC = () => {
     return <div className="h-screen w-screen flex items-center justify-center">Criando novo modelo...</div>;
 };
 
-
-function App(): React.ReactNode {
-  return (
-    <HashRouter>
-      <Routes>
+const AuthenticatedApp = () => (
+    <Routes>
         {/* Full-screen builder pages */}
         <Route path="/flows/new" element={<NewFlowRedirector />} />
         <Route path="/flows/:flowId" element={<FlowBuilderPage />} />
@@ -100,7 +99,35 @@ function App(): React.ReactNode {
             </Routes>
           </MainLayout>
         } />
-      </Routes>
+    </Routes>
+);
+
+function App(): React.ReactNode {
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const getSession = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        setSession(session);
+        setLoading(false);
+    }
+    getSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (loading) {
+      return <div className="h-screen w-screen flex items-center justify-center">Carregando...</div>;
+  }
+  
+  return (
+    <HashRouter>
+        {session ? <AuthenticatedApp /> : <AuthPage />}
     </HashRouter>
   );
 }

@@ -1,8 +1,10 @@
+
 import { v4 as uuidv4 } from 'uuid';
 import type { MessageTemplate, TemplateComponent } from '../types';
 import { supabase, type Json, type Database } from './supabaseClient';
 
 export async function getTemplates(): Promise<MessageTemplate[]> {
+  // RLS will handle filtering by user_id
   const { data, error } = await supabase
     .from('message_templates')
     .select('*')
@@ -20,6 +22,7 @@ export async function getTemplates(): Promise<MessageTemplate[]> {
 }
 
 export async function getTemplateById(id: string): Promise<MessageTemplate | undefined> {
+    // RLS will handle filtering by user_id
     const { data, error } = await supabase.from('message_templates').select('*').eq('id', id).single();
     if (error) {
         if (error.code === 'PGRST116') return undefined; // Not found
@@ -34,7 +37,11 @@ export async function getTemplateById(id: string): Promise<MessageTemplate | und
 }
 
 export async function addTemplate(): Promise<MessageTemplate> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Usuário não autenticado.");
+
   const newTemplateDataForDb = {
+    user_id: user.id,
     name: 'novo_modelo_sem_titulo',
     category: 'MARKETING',
     language: 'pt_BR',
@@ -61,7 +68,7 @@ export async function addTemplate(): Promise<MessageTemplate> {
 
 export async function updateTemplate(updatedTemplate: MessageTemplate): Promise<void> {
   const { id, metaId, rejectionReason, ...updateData } = updatedTemplate;
-
+  // RLS will protect this update
   const dbUpdateData = {
       ...updateData,
       meta_id: metaId,
@@ -78,10 +85,10 @@ export async function updateTemplate(updatedTemplate: MessageTemplate): Promise<
     console.error("Error updating template draft:", error);
     throw error;
   }
-  // No need to dispatch event as builder page handles its own state.
 }
 
 export async function deleteTemplate(id: string): Promise<void> {
+  // RLS will protect this deletion
   const { error } = await supabase.from('message_templates').delete().eq('id', id);
   if (error) {
     console.error("Error deleting template draft:", error);

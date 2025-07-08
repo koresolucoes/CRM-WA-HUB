@@ -2,11 +2,6 @@
 import { supabase } from './supabaseClient';
 import type { Contact, SheetContact, CrmStage } from '../types';
 
-/**
- * Maps a contact object from the database (snake_case) to the application's format (camelCase).
- * @param dbContact The raw contact object from Supabase.
- * @returns A contact object conforming to the `Contact` type.
- */
 function mapContactFromDb(dbContact: any): Contact {
   const contact: Contact = {
     id: dbContact.id,
@@ -19,7 +14,6 @@ function mapContactFromDb(dbContact: any): Contact {
     crmStageId: dbContact.funnel_column_id,
   };
 
-  // Add custom fields to the top level of the contact object
   if (dbContact.custom_fields && typeof dbContact.custom_fields === 'object') {
     Object.assign(contact, dbContact.custom_fields);
   }
@@ -27,19 +21,13 @@ function mapContactFromDb(dbContact: any): Contact {
   return contact;
 }
 
-/**
- * Maps a partial contact object from the application (camelCase) to the database's format (snake_case),
- * intelligently separating standard columns from custom fields.
- * @param appContact The partial contact object from the app, which may include custom fields.
- * @returns An object with snake_case keys and a `custom_fields` JSONB object, suitable for Supabase.
- */
-function mapContactToDb(appContact: Partial<Contact>): any {
+function mapContactToDb(appContact: Partial<Contact & { user_id?: string }>): any {
     const dbData: { [key: string]: any } = {};
     const customFields: { [key: string]: any } = {};
 
     const standardFields = new Set([
         'id', 'name', 'phone', 'tags', 
-        'lastInteraction', 'is24hWindowOpen', 'isOptedOutOfAutomations', 'crmStageId'
+        'lastInteraction', 'is24hWindowOpen', 'isOptedOutOfAutomations', 'crmStageId', 'user_id'
     ]);
 
     for (const key in appContact) {
@@ -77,13 +65,6 @@ function mapContactToDb(appContact: Partial<Contact>): any {
     return dbData;
 }
 
-
-/**
- * A robust CSV parser that handles commas within quoted fields.
- * It also handles empty lines and normalizes headers.
- * @param csvText The raw CSV string.
- * @returns An array of objects.
- */
 export function parseCsv(csvText: string): Record<string, string>[] {
     const lines = csvText.trim().replace(/\r/g, '').split('\n').filter(line => line.trim() !== '');
     if (lines.length < 2) {
@@ -115,6 +96,7 @@ export function parseCsv(csvText: string): Record<string, string>[] {
 }
 
 export async function getContacts(): Promise<Contact[]> {
+  // RLS handles filtering by user_id
   const { data, error } = await supabase.from('contacts').select('*').order('created_at', { ascending: false });
   if (error) {
     console.error('Error fetching contacts:', error);
@@ -124,6 +106,7 @@ export async function getContacts(): Promise<Contact[]> {
 }
 
 export async function getContactById(contactId: number): Promise<Contact | undefined> {
+  // RLS handles filtering by user_id
   const { data, error } = await supabase.from('contacts').select('*').eq('id', contactId).single();
   if (error) {
     if (error.code === 'PGRST116') return undefined;
@@ -134,14 +117,19 @@ export async function getContactById(contactId: number): Promise<Contact | undef
 }
 
 export async function addContact(contact: Partial<Omit<Contact, 'id'>>): Promise<Contact> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Usuário não autenticado.");
+
+    // RLS on funnels will ensure we get the user's own boards
     const { data: allBoards, error: boardError } = await supabase.from('funnels').select('id, columns').order('created_at', { ascending: true });
     if (boardError) console.error("Could not fetch boards for default stage");
 
     const firstBoard = allBoards?.[0];
-    const firstStageId = firstBoard?.columns?.[0]?.id;
+    const columnsAsArray = firstBoard?.columns as unknown as ({ id: string }[] | undefined);
+    const firstStageId = columnsAsArray?.[0]?.id;
 
-    const contactWithDefaults = { ...contact, crmStageId: contact.crmStageId || firstStageId };
-    const contactToInsert = mapContactToDb(contactWithDefaults);
+    const contactWithUserAndDefaults = { ...contact, user_id: user.id, crmStageId: contact.crmStageId || firstStageId };
+    const contactToInsert = mapContactToDb(contactWithUserAndDefaults);
 
     const { data: newContactData, error } = await supabase.from('contacts').insert([contactToInsert]).select().single();
 
@@ -161,6 +149,7 @@ export async function updateContact(updatedContact: Partial<Contact> & { id: num
     const { id, ...contactData } = updatedContact;
     const dbUpdateData = mapContactToDb(contactData);
     
+    // RLS ensures user can only update their own contacts
     const { error } = await supabase.from('contacts').update(dbUpdateData).eq('id', id);
     if (error) {
         console.error('Error updating contact:', error);
@@ -173,6 +162,7 @@ export async function updateContact(updatedContact: Partial<Contact> & { id: num
 }
 
 export async function deleteContact(contactId: number): Promise<void> {
+    // RLS ensures user can only delete their own contacts
     const { error } = await supabase.from('contacts').delete().eq('id', contactId);
     if (error) {
         console.error('Error deleting contact:', error);
@@ -184,6 +174,10 @@ export async function deleteContact(contactId: number): Promise<void> {
 }
 
 export async function addMultipleContacts(newContacts: SheetContact[], tagsToApply: string[] = []): Promise<Contact[]> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Usuário não autenticado.");
+
+    // RLS filters this query automatically
     const { data: existingContactsData, error: fetchError } = await supabase.from('contacts').select('phone');
     if (fetchError) {
         console.error('Erro ao buscar contatos existentes:', fetchError);
@@ -209,12 +203,16 @@ export async function addMultipleContacts(newContacts: SheetContact[], tagsToApp
     
     const { data: allBoards, error: boardError } = await supabase.from('funnels').select('id, columns').order('created_at', { ascending: true });
     if (boardError) console.error("Could not fetch boards for default stage");
-    const firstStageId = allBoards?.[0]?.columns?.[0]?.id;
+    
+    const firstBoard = allBoards?.[0];
+    const columnsAsArray = firstBoard?.columns as unknown as ({ id: string }[] | undefined);
+    const firstStageId = columnsAsArray?.[0]?.id;
 
     const formattedContacts = contactsToCreate.map(c => {
         const custom_fields = Object.fromEntries(Object.entries(c).filter(([key]) => !['name', 'phone', 'tags'].includes(key)));
         const fileTags = (typeof c.tags === 'string' && c.tags) ? c.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
         return {
+            user_id: user.id,
             name: c.name,
             phone: c.phone,
             tags: [...new Set([...fileTags, ...tagsToApply])],

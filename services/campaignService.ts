@@ -1,8 +1,10 @@
+
 import type { Campaign, CampaignLog, CampaignStatus, CampaignTarget } from '../types';
 import { supabase, type Json, type Database } from './supabaseClient';
 
-function mapCampaignToDb(campaign: Partial<Campaign>): Partial<Database['public']['Tables']['campaigns']['Insert']> {
+function mapCampaignToDb(campaign: Partial<Campaign & { user_id?: string }>): Partial<Database['public']['Tables']['campaigns']['Insert']> {
     return {
+        user_id: campaign.user_id,
         name: campaign.name,
         status: campaign.status,
         sent_count: campaign.sentCount,
@@ -34,6 +36,7 @@ function mapCampaignFromDb(dbCampaign: Database['public']['Tables']['campaigns']
 
 
 export async function getCampaigns(): Promise<Campaign[]> {
+    // RLS will automatically filter by user_id
     const { data, error } = await supabase.from('campaigns').select('*').order('created_at', { ascending: false });
     if (error) {
         console.error("Error fetching campaigns:", error);
@@ -43,6 +46,7 @@ export async function getCampaigns(): Promise<Campaign[]> {
 }
 
 export async function getCampaignById(id: number): Promise<Campaign | undefined> {
+    // RLS will automatically filter by user_id
     const { data, error } = await supabase.from('campaigns').select('*').eq('id', id).single();
     if (error) {
       if (error.code === 'PGRST116') return undefined; // Row not found
@@ -53,7 +57,11 @@ export async function getCampaignById(id: number): Promise<Campaign | undefined>
 }
 
 export async function addCampaign(campaign: Omit<Campaign, 'id'>): Promise<Campaign> {
-    const { data, error } = await supabase.from('campaigns').insert([mapCampaignToDb(campaign)]).select().single();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Usuário não autenticado.");
+
+    const campaignWithUser = { ...campaign, user_id: user.id };
+    const { data, error } = await supabase.from('campaigns').insert([mapCampaignToDb(campaignWithUser)]).select().single();
     if (error) {
         console.error("Error adding campaign:", error);
         throw new Error(error.message);
@@ -66,6 +74,7 @@ export async function addCampaign(campaign: Omit<Campaign, 'id'>): Promise<Campa
 
 export async function updateCampaign(updatedCampaign: Campaign): Promise<void> {
     const { id, ...campaignData } = updatedCampaign;
+    // RLS will ensure user can only update their own campaigns.
     const { error } = await supabase.from('campaigns').update(mapCampaignToDb(campaignData)).eq('id', id);
     if (error) {
         console.error("Error updating campaign:", error);
@@ -77,6 +86,7 @@ export async function updateCampaign(updatedCampaign: Campaign): Promise<void> {
 }
 
 export async function deleteCampaign(campaignId: number): Promise<void> {
+    // RLS will ensure user can only delete their own campaigns.
     const { error } = await supabase.from('campaigns').delete().eq('id', campaignId);
     if (error) {
         console.error("Error deleting campaign:", error);
@@ -96,6 +106,7 @@ export async function addCampaignLog(campaignId: number, log: Omit<CampaignLog, 
         };
         const updatedLogs = [newLog, ...(campaign.logs || [])];
         
+        // RLS protects this update.
         const { error } = await supabase
             .from('campaigns')
             .update({ logs: updatedLogs as unknown as Json })
@@ -105,6 +116,5 @@ export async function addCampaignLog(campaignId: number, log: Omit<CampaignLog, 
             console.error("Error adding campaign log:", error);
             throw new Error(error.message);
         }
-        // No need to dispatch event here as updateCampaign will be called right after
     }
 }
