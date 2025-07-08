@@ -1,11 +1,4 @@
 
-
-import type { ReactElement, ReactPortal } from 'react';
-
-type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
-type ReactNode = ReactElement | string | number | ReactPortal | boolean | null | undefined;
-
-
 export enum CampaignStatus {
   CONCLUIDA = 'Concluída',
   ENVIANDO = 'Enviando',
