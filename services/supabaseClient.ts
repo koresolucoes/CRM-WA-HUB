@@ -1,26 +1,26 @@
 
-
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './database.types';
 
 // --- INSTRUÇÕES PARA DEPLOY NO VERCEL ---
 // 1. Vá para o painel do seu projeto no Vercel.
 // 2. Vá para "Settings" -> "Environment Variables".
-// 3. Adicione as duas variáveis de ambiente a seguir:
+// 3. Adicione as duas variáveis de ambiente a seguir. Estas variáveis serão injetadas
+//    durante o processo de build para serem usadas no frontend.
 
-//    - Nome da Variável: NEXT_PUBLIC_SUPABASE_URL
+//    - Nome da Variável: SUPABASE_URL
 //      Valor: A URL do seu projeto Supabase (ex: https://xxxxxxxx.supabase.co)
 //      Encontre em: Painel do Supabase > Configurações do Projeto > API > URL
 
-//    - Nome da Variável: NEXT_PUBLIC_SUPABASE_ANON_KEY
+//    - Nome da Variável: SUPABASE_ANON_KEY
 //      Valor: A chave anônima (anon public) do seu projeto.
 //      Encontre em: Painel do Supabase > Configurações do Projeto > API > Chaves de API do Projeto
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  const errorMessage = "CONFIGURAÇÃO NECESSÁRIA: A URL ou a chave anônima do Supabase não foi definida nas variáveis de ambiente. Siga as instruções no arquivo 'services/supabaseClient.ts' para configurar seu deploy no Vercel.";
+  const errorMessage = "CONFIGURAÇÃO NECESSÁRIA: A URL (SUPABASE_URL) ou a chave anônima (SUPABASE_ANON_KEY) do Supabase não foi definida nas variáveis de ambiente. Siga as instruções neste arquivo para configurar seu deploy no Vercel.";
   console.error(errorMessage);
   throw new Error(errorMessage);
 }
