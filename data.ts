@@ -1,6 +1,5 @@
 
 
-
 import type { Campaign, Contact, WhatsAppFlow, FlowScreen, Conversation, Automation } from './types';
 import { CampaignStatus, FlowStatus, AutomationStatus } from './types';
 
@@ -8,6 +7,7 @@ import { CampaignStatus, FlowStatus, AutomationStatus } from './types';
 export const initialCampaigns: Campaign[] = [
   {
     id: 1,
+    user_id: 'placeholder_user_id',
     name: 'Lançamento Produto X',
     status: CampaignStatus.CONCLUIDA,
     sentCount: 12540,
@@ -21,6 +21,7 @@ export const initialCampaigns: Campaign[] = [
   },
   {
     id: 2,
+    user_id: 'placeholder_user_id',
     name: 'Promoção Dia das Mães',
     status: CampaignStatus.ENVIANDO,
     sentCount: 4500,
@@ -34,6 +35,7 @@ export const initialCampaigns: Campaign[] = [
   },
   {
     id: 3,
+    user_id: 'placeholder_user_id',
     name: 'Newsletter Semanal',
     status: CampaignStatus.AGENDADA,
     sentCount: 0,
@@ -47,6 +49,7 @@ export const initialCampaigns: Campaign[] = [
   },
    {
     id: 4,
+    user_id: 'placeholder_user_id',
     name: 'Update de Sistema',
     status: CampaignStatus.FALHA,
     sentCount: 100,
@@ -60,6 +63,7 @@ export const initialCampaigns: Campaign[] = [
   },
    {
     id: 5,
+    user_id: 'placeholder_user_id',
     name: 'Boas-vindas Novos Usuários',
     status: CampaignStatus.RASCUNHO,
     sentCount: 0,
@@ -77,6 +81,7 @@ export const initialCampaigns: Campaign[] = [
 export const initialContacts: Contact[] = [
   {
     id: 1,
+    user_id: 'placeholder_user_id',
     name: 'Ana Silva',
     phone: '+55 11 98765-4321',
     tags: ['cliente-vip', 'sp'],
@@ -85,6 +90,7 @@ export const initialContacts: Contact[] = [
   },
   {
     id: 2,
+    user_id: 'placeholder_user_id',
     name: 'Bruno Costa',
     phone: '+55 21 99887-6543',
     tags: ['desenvolvedor', 'rj'],
@@ -93,6 +99,7 @@ export const initialContacts: Contact[] = [
   },
   {
     id: 3,
+    user_id: 'placeholder_user_id',
     name: 'Carla Dias',
     phone: '+55 31 98877-1234',
     tags: ['lead', 'mg'],
@@ -101,6 +108,7 @@ export const initialContacts: Contact[] = [
   },
    {
     id: 4,
+    user_id: 'placeholder_user_id',
     name: 'Daniel Rocha',
     phone: '+55 81 99999-0000',
     tags: ['lead'],
@@ -109,6 +117,7 @@ export const initialContacts: Contact[] = [
   },
   {
     id: 5,
+    user_id: 'placeholder_user_id',
     name: 'Eduardo Martins',
     phone: '+55 71 98765-1111',
     tags: ['parceiro'],
@@ -214,6 +223,7 @@ export const initialConversations: Conversation[] = [
 export const initialAutomations: Automation[] = [
     {
         id: 'automation_1',
+        user_id: 'placeholder_user_id',
         name: 'Boas-vindas para Novos Contatos',
         status: AutomationStatus.ACTIVE,
         createdAt: new Date('2024-05-20T10:00:00Z').toISOString(),
@@ -249,6 +259,7 @@ export const initialAutomations: Automation[] = [
     },
      {
         id: 'automation_2',
+        user_id: 'placeholder_user_id',
         name: 'Recuperação de Carrinho Abandonado',
         status: AutomationStatus.PAUSED,
         createdAt: new Date('2024-05-15T15:30:00Z').toISOString(),

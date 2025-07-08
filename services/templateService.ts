@@ -2,7 +2,8 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import type { MessageTemplate, TemplateComponent } from '../types';
-import { supabase, type Json, type Database } from './supabaseClient';
+import { supabase } from './supabaseClient';
+import type { Json, Database } from './database.types';
 
 export async function getTemplates(): Promise<MessageTemplate[]> {
   // RLS will handle filtering by user_id
@@ -53,7 +54,7 @@ export async function addTemplate(): Promise<MessageTemplate> {
     ] as unknown as Json,
   };
 
-  const { data, error } = await supabase.from('message_templates').insert([newTemplateDataForDb]).select().single();
+  const { data, error } = await supabase.from('message_templates').insert([newTemplateDataForDb as any]).select().single();
 
   if (error) {
     console.error("Error adding template draft:", error);
@@ -80,7 +81,7 @@ export async function updateTemplate(updatedTemplate: MessageTemplate): Promise<
 
   const { error } = await supabase
     .from('message_templates')
-    .update(dbUpdateData)
+    .update(dbUpdateData as any)
     .eq('id', id);
   
   if (error) {

@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { BellIcon, SettingsIcon, ArrowLeftOnRectangleIcon } from './icons';
-import { getActiveConnection, getConnections, setActiveConnectionId, disconnectActiveConnection, type MetaConnection } from '../services/metaService';
+import { getActiveConnection, getConnections, setActiveConnectionId, disconnectActiveConnection } from '../services/metaService';
+import type { MetaConnection } from '../types';
 import { searchService } from '../services/searchService';
 import { signOut } from '../services/authService';
 import { supabase } from '../services/supabaseClient';

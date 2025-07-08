@@ -24,6 +24,7 @@ export type CampaignLog = {
 
 export interface Campaign {
   id: number;
+  user_id: string;
   name: string;
   status: CampaignStatus;
   sentCount: number;

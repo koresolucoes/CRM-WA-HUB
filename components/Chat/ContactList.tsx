@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import type { Contact, Conversation } from '../../types';
 import { getContacts } from '../../services/contactService';
@@ -43,7 +44,7 @@ function ContactList({ selectedContactId, onSelectContact }: ContactListProps): 
           getConversations().then(setConversations);
 
           // Also check if we need to refresh the contacts list
-          const contactIdInPayload = payload.new?.contact_id;
+          const contactIdInPayload = (payload.new as any)?.contact_id;
           if(contactIdInPayload && !contacts.some(c => c.id === contactIdInPayload)){
               getContacts().then(setContacts);
           }

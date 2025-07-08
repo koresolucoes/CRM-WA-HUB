@@ -96,7 +96,7 @@ export async function addFlow(): Promise<WhatsAppFlow> {
         screens: [newScreen],
     };
 
-    const { data, error } = await supabase.from('whatsapp_flows').insert([mapFlowToDb(newFlow)]).select().single();
+    const { data, error } = await supabase.from('whatsapp_flows').insert([mapFlowToDb(newFlow) as any]).select().single();
     if (error) throw error;
     
     window.dispatchEvent(new CustomEvent('localDataChanged'));
@@ -108,7 +108,7 @@ export async function updateFlow(flow: WhatsAppFlow): Promise<WhatsAppFlow> {
     // RLS protects this update
     const { data, error } = await supabase
         .from('whatsapp_flows')
-        .update(mapFlowToDb(updateData))
+        .update(mapFlowToDb(updateData) as any)
         .eq('id', id)
         .select()
         .single();
@@ -164,7 +164,7 @@ export async function syncFlowsWithMeta(): Promise<void> {
                 endpoint_uri: metaFlow.endpointUri,
                 origin: 'meta',
             };
-            return supabase.from('whatsapp_flows').update(updateData).eq('id', existingLocal.id);
+            return supabase.from('whatsapp_flows').update(updateData as any).eq('id', existingLocal.id);
         } else {
             const newFlowData = {
                 user_id: user.id,
@@ -178,7 +178,7 @@ export async function syncFlowsWithMeta(): Promise<void> {
                 routing_model: {},
                 screens: [],
             };
-            return supabase.from('whatsapp_flows').insert([newFlowData]);
+            return supabase.from('whatsapp_flows').insert([newFlowData as any]);
         }
     });
 

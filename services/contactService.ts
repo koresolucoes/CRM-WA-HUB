@@ -6,6 +6,7 @@ import type { Contact, SheetContact, CrmStage } from '../types';
 function mapContactFromDb(dbContact: any): Contact {
   const contact: Contact = {
     id: dbContact.id,
+    user_id: dbContact.user_id,
     name: dbContact.name,
     phone: dbContact.phone,
     tags: dbContact.tags || [],
@@ -133,7 +134,7 @@ export async function addContact(contact: Partial<Omit<Contact, 'id'>>): Promise
     const contactWithUserAndDefaults = { ...contact, user_id: user.id, crmStageId: contact.crmStageId || firstStageId };
     const contactToInsert = mapContactToDb(contactWithUserAndDefaults);
 
-    const { data: newContactData, error } = await supabase.from('contacts').insert([contactToInsert]).select().single();
+    const { data: newContactData, error } = await supabase.from('contacts').insert([contactToInsert as any]).select().single();
 
     if (error) {
         console.error('Error adding contact:', error);
@@ -152,7 +153,7 @@ export async function updateContact(updatedContact: Partial<Contact> & { id: num
     const dbUpdateData = mapContactToDb(contactData);
     
     // RLS ensures user can only update their own contacts
-    const { error } = await supabase.from('contacts').update(dbUpdateData).eq('id', id);
+    const { error } = await supabase.from('contacts').update(dbUpdateData as any).eq('id', id);
     if (error) {
         console.error('Error updating contact:', error);
         throw new Error(error.message);
@@ -224,7 +225,7 @@ export async function addMultipleContacts(newContacts: SheetContact[], tagsToApp
         };
     });
 
-    const { data: insertedData, error: insertError } = await supabase.from('contacts').insert(formattedContacts).select();
+    const { data: insertedData, error: insertError } = await supabase.from('contacts').insert(formattedContacts as any).select();
     if (insertError) {
         console.error('Erro ao inserir múltiplos contatos:', insertError);
         throw new Error(insertError.message);

@@ -144,10 +144,10 @@ export async function saveConnection(connection: Omit<MetaConnection, 'id' | 'us
     };
     
     if ('id' in connection && connection.id) {
-        const { error } = await supabase.from('meta_connections').update(connectionData).eq('id', connection.id).eq('user_id', user.id);
+        const { error } = await supabase.from('meta_connections').update(connectionData as any).eq('id', connection.id).eq('user_id', user.id);
         if (error) throw new Error(error.message);
     } else {
-        const { error } = await supabase.from('meta_connections').insert([connectionData]);
+        const { error } = await supabase.from('meta_connections').insert([connectionData as any]);
         if (error) throw new Error(error.message);
     }
 }

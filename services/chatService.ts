@@ -16,7 +16,7 @@ export async function getConversations(): Promise<Conversation[]> {
     }
     return (data || []).map(c => ({
         contactId: c.contact_id,
-        messages: c.messages,
+        messages: c.messages as any,
         unreadCount: c.unread_count,
     }));
 }
@@ -31,7 +31,7 @@ export async function getConversationByContactId(contactId: number): Promise<Con
     }
     return data ? {
         contactId: data.contact_id,
-        messages: data.messages,
+        messages: data.messages as any,
         unreadCount: data.unread_count,
     } : undefined;
 }
@@ -45,7 +45,7 @@ async function updateMessageStatus(messageId: string, contactId: number, status:
             // RLS protects this update
             const { error } = await supabase
                 .from('conversations')
-                .update({ messages: convo.messages, updated_at: new Date().toISOString() })
+                .update({ messages: convo.messages, updated_at: new Date().toISOString() } as any)
                 .eq('contact_id', contactId);
             if (error) throw new Error(error.message);
             if (typeof window !== 'undefined') {
@@ -87,7 +87,7 @@ export async function addMessage(contactId: number, message: Omit<ChatMessage, '
         
         const { error } = await client
             .from('conversations')
-            .update({ messages: updatedMessages, unread_count: updatedUnreadCount, updated_at: new Date().toISOString() })
+            .update({ messages: updatedMessages, unread_count: updatedUnreadCount, updated_at: new Date().toISOString() } as any)
             .eq('id', convo.id);
         if (error) throw new Error(error.message);
     } else {
@@ -98,7 +98,7 @@ export async function addMessage(contactId: number, message: Omit<ChatMessage, '
             unread_count: message.sender === 'contact' ? 1 : 0,
             updated_at: new Date().toISOString()
         };
-        const { error } = await client.from('conversations').insert([newConvo]);
+        const { error } = await client.from('conversations').insert([newConvo as any]);
         if (error) throw new Error(error.message);
     }
     
@@ -113,7 +113,7 @@ export async function markAsRead(contactId: number) {
     if (convo && convo.unreadCount > 0) {
         const { error } = await supabase
             .from('conversations')
-            .update({ unread_count: 0, updated_at: new Date().toISOString() })
+            .update({ unread_count: 0, updated_at: new Date().toISOString() } as any)
             .eq('contact_id', contactId);
         if (error) throw new Error(error.message);
         if (typeof window !== 'undefined') {

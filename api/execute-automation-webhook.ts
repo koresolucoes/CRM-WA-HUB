@@ -1,8 +1,8 @@
 // api/execute-automation-webhook.ts
-import { updateAutomation } from '../services/automationService';
-import { runAutomations } from '../services/automationService';
-import { supabaseAdmin } from '../services/supabaseAdminClient';
-import type { Automation, TriggerWebhookData } from '../types';
+import { updateAutomation } from '../../services/automationService';
+import { runAutomations } from '../../services/automationService';
+import { supabaseAdmin } from '../../services/supabaseAdminClient';
+import type { Automation, TriggerWebhookData } from '../../types';
 
 export default async function handler(req: any, res: any) {
     if (req.method !== 'POST') {
@@ -88,7 +88,7 @@ export default async function handler(req: any, res: any) {
                 tags: body.tags || [],
                 custom_fields: body,
             };
-            const { data: newContact, error: createError } = await supabaseAdmin.from('contacts').insert(newContactData).select().single();
+            const { data: newContact, error: createError } = await supabaseAdmin.from('contacts').insert(newContactData as any).select().single();
             if (createError) throw createError;
             contact = newContact;
         }

@@ -9,7 +9,8 @@ import type {
     MetaConnection
 } from '../types';
 import { AutomationStatus } from '../types';
-import { supabase, type Json } from './supabaseClient';
+import { supabase } from './supabaseClient';
+import type { Json } from './database.types';
 import { getContactById, updateContact, setContactOptOutStatus, moveContactToCrmStage } from './contactService';
 import { sendAutomatedMessage, sendFlowMessage } from './chatService';
 import { sendMessage as sendTemplateMessage, getMessageTemplates, getActiveConnection } from './metaService';
@@ -24,6 +25,7 @@ export async function getAutomations(): Promise<Automation[]> {
     }
     return (data || []).map(a => ({
         id: a.id,
+        user_id: a.user_id,
         name: a.name,
         status: a.status as AutomationStatus,
         nodes: a.nodes as unknown as AutomationNode[],
@@ -45,6 +47,7 @@ export async function getAutomationById(id: string): Promise<Automation | undefi
     }
     return data ? {
         id: data.id,
+        user_id: data.user_id,
         name: data.name,
         status: data.status as AutomationStatus,
         nodes: data.nodes as unknown as AutomationNode[],
@@ -79,7 +82,7 @@ export async function addAutomation(details: {
         execution_stats: {},
     };
     
-    const { data, error } = await supabase.from('automations').insert(newAutomationData).select().single();
+    const { data, error } = await supabase.from('automations').insert(newAutomationData as any).select().single();
     
     if (error) {
         console.error("Error adding automation:", error);
@@ -92,6 +95,7 @@ export async function addAutomation(details: {
 
     return {
         id: data.id,
+        user_id: data.user_id,
         name: data.name,
         status: data.status as AutomationStatus,
         nodes: data.nodes as unknown as AutomationNode[],
@@ -108,7 +112,7 @@ export async function updateAutomation(updatedAutomation: Automation): Promise<v
     // RLS protects this update
     const { error } = await supabase
         .from('automations')
-        .update({ name, status, nodes: nodes as unknown as Json, edges: edges as unknown as Json, allow_reactivation: allowReactivation, block_on_open_chat: blockOnOpenChat, execution_stats: executionStats as unknown as Json })
+        .update({ name, status, nodes: nodes as unknown as Json, edges: edges as unknown as Json, allow_reactivation: allowReactivation, block_on_open_chat: blockOnOpenChat, execution_stats: executionStats as unknown as Json } as any)
         .eq('id', id);
     if (error) {
         console.error("Error updating automation:", error);
@@ -255,6 +259,7 @@ export async function executeAutomation(
                     
                     if (resume_from_node_id) {
                         await supabase.from('scheduled_automation_tasks').insert([{
+                            user_id: contact.user_id,
                             contact_id: contact.id,
                             automation_id: automationToExecute.id,
                             resume_from_node_id,
@@ -262,7 +267,7 @@ export async function executeAutomation(
                             meta_connection_id: connection.id,
                             context: initialContext as unknown as Json,
                             status: 'pending'
-                        }]);
+                        } as any]);
                         stats[nodeId].success++;
                         await updateAutomation(automationToExecute);
                         return;
@@ -435,6 +440,7 @@ export async function runAutomations(triggerType: AutomationTriggerType, context
 
     const allAutomations: Automation[] = (allAutomationsData || []).map(a => ({
         id: a.id,
+        user_id: a.user_id,
         name: a.name,
         status: a.status as AutomationStatus,
         nodes: a.nodes as unknown as AutomationNode[],
