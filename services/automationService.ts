@@ -1,18 +1,18 @@
 
 
-
 import { v4 as uuidv4 } from 'uuid';
 import type {
     Automation, AutomationNode, TriggerCrmStageChangedData, TriggerTagAddedData, AutomationTriggerType,
     Contact, ActionSendMessageData, ActionWaitData, ActionAddTagData, ActionRemoveTagData,
     ActionMoveCrmStageData, ActionConditionalData, ActionHttpRequestData, ActionForwardAutomationData, TriggerContextMessageData,
-    AutomationActionData
+    AutomationActionData,
+    MetaConnection
 } from '../types';
 import { AutomationStatus } from '../types';
 import { supabase, type Json } from './supabaseClient';
 import { getContactById, updateContact, setContactOptOutStatus, moveContactToCrmStage } from './contactService';
 import { sendAutomatedMessage, sendFlowMessage } from './chatService';
-import { sendMessage as sendTemplateMessage, getMessageTemplates, getActiveConnection, type MetaConnection } from './metaService';
+import { sendMessage as sendTemplateMessage, getMessageTemplates, getActiveConnection } from './metaService';
 import { getAllStages } from './crmService';
 
 export async function getAutomations(): Promise<Automation[]> {

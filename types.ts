@@ -1,6 +1,5 @@
 
 
-
 import type React from 'react';
 
 export enum CampaignStatus {
@@ -134,6 +133,15 @@ export interface StatCardData {
   change: string;
   changeType: 'increase' | 'decrease';
   icon: React.ReactNode;
+}
+
+export interface MetaConnection {
+  id: string;
+  user_id: string;
+  name: string;
+  wabaId: string;
+  phoneNumberId: string;
+  apiToken: string;
 }
 
 export interface CrmStage {

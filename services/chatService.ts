@@ -1,9 +1,8 @@
 
 
-
 import { v4 as uuidv4 } from 'uuid';
-import type { Conversation, ChatMessage, Contact, ActionSendMessageData } from '../types';
-import { getActiveConnection, sendTextMessage, sendFlowMessage as sendFlowMessageApi, type MetaConnection } from './metaService';
+import type { Conversation, ChatMessage, Contact, ActionSendMessageData, MetaConnection } from '../types';
+import { getActiveConnection, sendTextMessage, sendFlowMessage as sendFlowMessageApi } from './metaService';
 import { getContactById, getContacts } from './contactService';
 import { supabase } from './supabaseClient';
 import { supabaseAdmin } from './supabaseAdminClient';

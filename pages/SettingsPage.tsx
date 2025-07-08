@@ -8,9 +8,9 @@ import {
     getActiveConnectionId,
     setActiveConnectionId,
     disconnectActiveConnection,
-    testConnection,
-    type MetaConnection 
+    testConnection
 } from '../services/metaService';
+import type { MetaConnection } from '../types';
 import { formFieldClasses } from '../components/ui/styleConstants';
 
 type TestResult = {

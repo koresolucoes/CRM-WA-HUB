@@ -1,9 +1,9 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { getContacts, addMultipleContacts } from '../services/contactService';
-import { getActiveConnection, getMessageTemplates, sendMessage, type MetaConnection } from '../services/metaService';
+import { getActiveConnection, getMessageTemplates, sendMessage } from '../services/metaService';
 import { fetchAndParseSheet } from '../services/googleSheetService';
-import type { MessageTemplate, SheetContact, BodyComponent, Contact } from '../types';
+import type { MessageTemplate, SheetContact, BodyComponent, Contact, MetaConnection } from '../types';
 import { TableCellsIcon } from '../components/icons';
 import { runAutomations } from '../services/automationService';
 import { formFieldClasses } from '../components/ui/styleConstants';

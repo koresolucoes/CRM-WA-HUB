@@ -1,21 +1,11 @@
 
 
-
 import { v4 as uuidv4 } from 'uuid';
 import { FlowStatus } from '../types';
-import type { MessageTemplate, AnalyticsDataPoint, WhatsAppFlow, Button, ActionSendMessageData } from '../types';
+import type { MessageTemplate, AnalyticsDataPoint, WhatsAppFlow, Button, ActionSendMessageData, MetaConnection } from '../types';
 import { generateFlowJsonForApi } from './flowSerializer';
 import { supabase } from './supabaseClient';
 
-
-export interface MetaConnection {
-  id: string;
-  user_id: string;
-  name: string;
-  wabaId: string;
-  phoneNumberId: string;
-  apiToken: string;
-}
 
 const ACTIVE_META_CONNECTION_ID_KEY_PREFIX = 'activeMetaConnectionId_';
 const API_VERSION = 'v19.0';
