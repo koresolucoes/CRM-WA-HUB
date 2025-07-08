@@ -33,32 +33,59 @@
       }
     </style>
 
-<script type="importmap">
+    <script>
+      // Dynamically create the importmap to prevent build tools from misinterpreting CDN URLs with query parameters.
+      // This resolves the "EINVALIDTAGNAME" npm error during deployment by hiding the URLs from static analysis,
+      // while still enforcing a single version of React across all dependencies to prevent runtime errors.
+      const reactVersion = "18.3.1";
+      const reactDeps = `?deps=react@${reactVersion},react-dom@${reactVersion}`;
+      const reactOnlyDeps = `?deps=react@${reactVersion}`;
+
+      const importmap = {
+        imports: {
+          "react": `https://esm.sh/react@${reactVersion}`,
+          "react-dom/": `https://esm.sh/react-dom@${reactVersion}/`,
+          "react/": `https://esm.sh/react@${reactVersion}/`,
+          "react-router-dom": `https://esm.sh/react-router-dom@6.25.1${reactOnlyDeps}`,
+          "recharts": `https://esm.sh/recharts@2.12.7${reactDeps}`,
+          "@google/genai": "https://esm.sh/@google/genai@0.14.0",
+          "uuid": "https://esm.sh/uuid@9.0.1",
+          "reactflow": `https://esm.sh/reactflow@11.11.4${reactDeps}`,
+          "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.44.3",
+          "d3-drag": "https://esm.sh/d3-drag@3.0.0",
+          "d3-transition": "https://esm.sh/d3-transition@3.0.1",
+          "d3-zoom": "https://esm.sh/d3-zoom@3.0.0",
+          "d3-selection": "https://esm.sh/d3-selection@3.0.0",
+          "d3-shape": "https://esm.sh/d3-shape@3.2.0",
+          "d3-path": "https://esm.sh/d3-path@3.1.0",
+          "d3-interpolate": "https://esm.sh/d3-interpolate@3.0.1",
+          "d3-scale": "https://esm.sh/d3-scale@4.0.2",
+          "d3-format": "https://esm.sh/d3-format@3.1.0",
+          "d3-time": "https://esm.sh/d3-time@3.1.0",
+          "d3-time-format": "https://esm.sh/d3-time-format@4.1.0",
+          "zustand": `https://esm.sh/zustand@4.5.2${reactOnlyDeps}`,
+          "zustand/": `https://esm.sh/zustand@4.5.2/`,
+          "classcat": "https://esm.sh/classcat@5.0.5",
+        },
+      };
+
+      const imScript = document.createElement('script');
+      imScript.type = 'importmap';
+      imScript.textContent = JSON.stringify(importmap);
+      document.head.appendChild(imScript);
+    </script>
+  <script type="importmap">
 {
   "imports": {
-    "react": "https://esm.sh/react@18.3.1",
-    "react-dom/": "https://esm.sh/react-dom@18.3.1/",
-    "react/": "https://esm.sh/react@18.3.1/",
-    "react-router-dom": "https://esm.sh/react-router-dom@6.25.1?deps=react@18.3.1",
-    "recharts": "https://esm.sh/recharts@2.12.7?deps=react@18.3.1,react-dom@18.3.1",
-    "@google/genai": "https://esm.sh/@google/genai@0.14.0",
-    "uuid": "https://esm.sh/uuid@9.0.1",
-    "reactflow": "https://esm.sh/reactflow@11.11.4?deps=react@18.3.1,react-dom@18.3.1",
-    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.44.3",
-    "d3-drag": "https://esm.sh/d3-drag@3.0.0",
-    "d3-transition": "https://esm.sh/d3-transition@3.0.1",
-    "d3-zoom": "https://esm.sh/d3-zoom@3.0.0",
-    "d3-selection": "https://esm.sh/d3-selection@3.0.0",
-    "d3-shape": "https://esm.sh/d3-shape@3.2.0",
-    "d3-path": "https://esm.sh/d3-path@3.1.0",
-    "d3-interpolate": "https://esm.sh/d3-interpolate@3.0.1",
-    "d3-scale": "https://esm.sh/d3-scale@4.0.2",
-    "d3-format": "https://esm.sh/d3-format@3.1.0",
-    "d3-time": "https://esm.sh/d3-time@3.1.0",
-    "d3-time-format": "https://esm.sh/d3-time-format@4.1.0",
-    "zustand": "https://esm.sh/zustand@4.5.2?deps=react@18.3.1",
-    "zustand/": "https://esm.sh/zustand@4.5.2/",
-    "classcat": "https://esm.sh/classcat@5.0.5"
+    "react": "https://esm.sh/react@^19.1.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.1.0/",
+    "react/": "https://esm.sh/react@^19.1.0/",
+    "react-router-dom": "https://esm.sh/react-router-dom@^7.6.3",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.50.3",
+    "recharts": "https://esm.sh/recharts@^3.0.2",
+    "@google/genai": "https://esm.sh/@google/genai@^1.8.0",
+    "uuid": "https://esm.sh/uuid@^11.1.0",
+    "reactflow": "https://esm.sh/reactflow@^11.11.4"
   }
 }
 </script>
