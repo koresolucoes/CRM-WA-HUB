@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { DashboardIcon, CampaignIcon, ContactsIcon, TemplatesIcon, SettingsIcon, PaperAirplaneIcon, TableCellsIcon, FlowsIcon, ChatBubbleOvalLeftEllipsisIcon, SparklesIcon } from './icons';
@@ -34,7 +33,7 @@ function Sidebar(): React.ReactNode {
       <aside className={`fixed inset-y-0 left-0 z-10 w-64 px-6 py-4 overflow-y-auto bg-white border-r transform lg:translate-x-0 transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center">
-             <img src="https://pratiquefitness.com.br/wp-content/uploads/2022/02/Pratique-Fitness-logo.png" alt="Pratique Fitness Logo" className="h-10 w-auto" />
+             <img src="https://koresolucoes.com.br/kore-logo.png" alt="Kore Soluções Logo" className="h-14 w-auto" />
 
           </div>
            <button onClick={() => setIsOpen(false)} className="text-gray-500 lg:hidden">

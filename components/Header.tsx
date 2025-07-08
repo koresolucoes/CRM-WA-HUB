@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { BellIcon, SettingsIcon, ArrowLeftOnRectangleIcon } from './icons';
@@ -23,8 +24,8 @@ function Header(): React.ReactNode {
   };
   
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-        setUserEmail(user?.email || null);
+    supabase.auth.getUser().then(({ data }) => {
+        setUserEmail(data.user?.email || null);
     });
 
     updateConnectionState();
@@ -52,16 +53,16 @@ function Header(): React.ReactNode {
     };
   }, []);
   
-  const handleSwitchConnection = (id: string) => {
-    setActiveConnectionId(id);
-    updateConnectionState(); // Update state immediately
+  const handleSwitchConnection = async (id: string) => {
+    await setActiveConnectionId(id);
+    await updateConnectionState(); // Update state immediately
     window.dispatchEvent(new CustomEvent('metaConnectionChanged')); // Notify other components
     setIsProfileOpen(false);
   };
   
-  const handleDisconnect = () => {
-    disconnectActiveConnection();
-    updateConnectionState();
+  const handleDisconnect = async () => {
+    await disconnectActiveConnection();
+    await updateConnectionState();
     window.dispatchEvent(new CustomEvent('metaConnectionChanged'));
     setIsProfileOpen(false);
   };

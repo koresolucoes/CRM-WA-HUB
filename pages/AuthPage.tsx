@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { signIn, signUp } from '../services/authService';
 
@@ -34,7 +33,7 @@ function AuthPage(): React.ReactNode {
         <div className="flex items-center justify-center min-h-screen bg-gray-100">
             <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-xl shadow-lg">
                 <div className="text-center">
-                    <img src="https://pratiquefitness.com.br/wp-content/uploads/2022/02/Pratique-Fitness-logo.png" alt="Pratique Fitness Logo" className="h-12 w-auto mx-auto mb-4" />
+                    <img src="https://koresolucoes.com.br/kore-logo.png" alt="Kore Soluções Logo" className="h-16 w-auto mx-auto mb-4" />
                     <h1 className="text-2xl font-bold text-gray-800">
                         {isLoginView ? 'Bem-vindo de volta!' : 'Crie sua conta'}
                     </h1>

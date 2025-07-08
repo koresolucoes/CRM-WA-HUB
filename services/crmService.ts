@@ -1,4 +1,5 @@
 
+
 import { v4 as uuidv4 } from 'uuid';
 import type { CrmBoard, CrmStage } from '../types';
 import { supabase } from './supabaseClient';
@@ -37,7 +38,8 @@ export async function getBoardById(id: string): Promise<CrmBoard | null> {
 }
 
 export async function createBoard(name: string): Promise<CrmBoard> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: authData } = await supabase.auth.getUser();
+    const user = authData?.user;
     if (!user) throw new Error("Usuário não autenticado.");
 
     const newBoardData = {
@@ -61,7 +63,8 @@ export async function createBoard(name: string): Promise<CrmBoard> {
 }
 
 export async function createRawBoard(board: Omit<CrmBoard, 'id'> & { id?: string }): Promise<CrmBoard> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: authData } = await supabase.auth.getUser();
+    const user = authData?.user;
     if (!user) throw new Error("Usuário não autenticado.");
 
     const boardWithUser = { ...board, user_id: user.id };

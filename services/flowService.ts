@@ -1,4 +1,5 @@
 
+
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from './supabaseClient';
 import type { WhatsAppFlow, FlowScreen, FlowComponent } from '../types';
@@ -63,7 +64,8 @@ export async function getFlowById(id: string): Promise<WhatsAppFlow | null> {
 }
 
 export async function addFlow(): Promise<WhatsAppFlow> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: authData } = await supabase.auth.getUser();
+    const user = authData?.user;
     if (!user) throw new Error("Usuário não autenticado.");
 
     const newScreen: FlowScreen = {
@@ -141,7 +143,8 @@ export async function syncFlowsWithMeta(): Promise<void> {
         return;
     }
     
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: authData } = await supabase.auth.getUser();
+    const user = authData?.user;
     if (!user) return;
 
     const [metaFlows, localFlows] = await Promise.all([

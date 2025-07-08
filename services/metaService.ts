@@ -1,4 +1,5 @@
 
+
 import { v4 as uuidv4 } from 'uuid';
 import { FlowStatus } from '../types';
 import type { MessageTemplate, AnalyticsDataPoint, WhatsAppFlow, TemplateComponent, Button, ActionSendMessageData } from '../types';
@@ -97,7 +98,8 @@ function handleMetaApiError(errorData: any, defaultMessage: string): Error {
 
 
 export async function getConnections(): Promise<MetaConnection[]> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: authData } = await supabase.auth.getUser();
+  const user = authData?.user;
   if (!user) return [];
 
   const { data, error } = await supabase.from('meta_connections').select('*').eq('user_id', user.id);
@@ -117,7 +119,8 @@ export async function getConnections(): Promise<MetaConnection[]> {
 }
 
 export async function getConnectionById(id: string): Promise<MetaConnection | null> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: authData } = await supabase.auth.getUser();
+    const user = authData?.user;
     if (!user) return null;
 
     const { data, error } = await supabase.from('meta_connections').select('*').eq('id', id).eq('user_id', user.id).single();
@@ -137,7 +140,8 @@ export async function getConnectionById(id: string): Promise<MetaConnection | nu
 }
 
 export async function saveConnection(connection: Omit<MetaConnection, 'id' | 'user_id'> | MetaConnection): Promise<void> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: authData } = await supabase.auth.getUser();
+    const user = authData?.user;
     if (!user) throw new Error("Usuário não autenticado.");
 
     const connectionData = {
@@ -158,7 +162,8 @@ export async function saveConnection(connection: Omit<MetaConnection, 'id' | 'us
 }
 
 export async function deleteConnection(id: string): Promise<void> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: authData } = await supabase.auth.getUser();
+    const user = authData?.user;
     if (!user) throw new Error("Usuário não autenticado.");
 
     // The RLS policy will ensure a user can only delete their own connections.
@@ -168,28 +173,24 @@ export async function deleteConnection(id: string): Promise<void> {
         throw new Error(`Não foi possível apagar a conexão: ${error.message}`);
     }
 
-    const activeId = getActiveConnectionId();
+    const activeId = await getActiveConnectionId();
     if (activeId === id) {
-        if (typeof window !== 'undefined') {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-              localStorage.removeItem(`${ACTIVE_META_CONNECTION_ID_KEY_PREFIX}${user.id}`);
-            }
-        }
+        await disconnectActiveConnection();
     }
 }
 
 export async function getActiveConnection(): Promise<MetaConnection | null> {
-  const activeId = getActiveConnectionId();
+  const activeId = await getActiveConnectionId();
   if (!activeId) return null;
   // This will only fetch connections for the logged-in user due to RLS.
   const connections = await getConnections();
   return connections.find(c => c.id === activeId) || null;
 }
 
-export function getActiveConnectionId(): string | null {
+export async function getActiveConnectionId(): Promise<string | null> {
     if (typeof window !== 'undefined' && window.localStorage) {
-        const { data: { user } } = supabase.auth.getUser();
+        const { data: authData } = await supabase.auth.getUser();
+        const user = authData?.user;
         if (user) {
           return localStorage.getItem(`${ACTIVE_META_CONNECTION_ID_KEY_PREFIX}${user.id}`);
         }
@@ -197,18 +198,20 @@ export function getActiveConnectionId(): string | null {
     return null;
 }
 
-export function setActiveConnectionId(id: string): void {
+export async function setActiveConnectionId(id: string): Promise<void> {
     if (typeof window !== 'undefined' && window.localStorage) {
-        const { data: { user } } = supabase.auth.getUser();
+        const { data: authData } = await supabase.auth.getUser();
+        const user = authData?.user;
         if (user) {
           localStorage.setItem(`${ACTIVE_META_CONNECTION_ID_KEY_PREFIX}${user.id}`, id);
         }
     }
 }
 
-export function disconnectActiveConnection(): void {
+export async function disconnectActiveConnection(): Promise<void> {
     if (typeof window !== 'undefined' && window.localStorage) {
-        const { data: { user } } = supabase.auth.getUser();
+        const { data: authData } = await supabase.auth.getUser();
+        const user = authData?.user;
         if (user) {
           localStorage.removeItem(`${ACTIVE_META_CONNECTION_ID_KEY_PREFIX}${user.id}`);
         }

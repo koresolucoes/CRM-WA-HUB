@@ -1,4 +1,5 @@
 
+
 import { supabase } from './supabaseClient';
 import type { Contact, SheetContact, CrmStage } from '../types';
 
@@ -117,7 +118,8 @@ export async function getContactById(contactId: number): Promise<Contact | undef
 }
 
 export async function addContact(contact: Partial<Omit<Contact, 'id'>>): Promise<Contact> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: authData } = await supabase.auth.getUser();
+    const user = authData?.user;
     if (!user) throw new Error("Usuário não autenticado.");
 
     // RLS on funnels will ensure we get the user's own boards
@@ -174,7 +176,8 @@ export async function deleteContact(contactId: number): Promise<void> {
 }
 
 export async function addMultipleContacts(newContacts: SheetContact[], tagsToApply: string[] = []): Promise<Contact[]> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: authData } = await supabase.auth.getUser();
+    const user = authData?.user;
     if (!user) throw new Error("Usuário não autenticado.");
 
     // RLS filters this query automatically

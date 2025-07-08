@@ -1,4 +1,5 @@
 
+
 import { v4 as uuidv4 } from 'uuid';
 import type { MessageTemplate, TemplateComponent } from '../types';
 import { supabase, type Json, type Database } from './supabaseClient';
@@ -37,7 +38,8 @@ export async function getTemplateById(id: string): Promise<MessageTemplate | und
 }
 
 export async function addTemplate(): Promise<MessageTemplate> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: authData } = await supabase.auth.getUser();
+  const user = authData?.user;
   if (!user) throw new Error("Usuário não autenticado.");
 
   const newTemplateDataForDb = {

@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
@@ -108,8 +109,8 @@ function App(): React.ReactNode {
 
   useEffect(() => {
     const getSession = async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        setSession(session);
+        const { data } = await supabase.auth.getSession();
+        setSession(data.session);
         setLoading(false);
     }
     getSession();

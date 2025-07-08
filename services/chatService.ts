@@ -1,4 +1,5 @@
 
+
 import { v4 as uuidv4 } from 'uuid';
 import type { Conversation, ChatMessage, Contact, ActionSendMessageData } from '../types';
 import { getActiveConnection, sendTextMessage, sendFlowMessage as sendFlowMessageApi, type MetaConnection } from './metaService';
@@ -54,7 +55,8 @@ async function updateMessageStatus(messageId: string, contactId: number, status:
 }
 
 export async function addMessage(contactId: number, message: Omit<ChatMessage, 'id' | 'timestamp'>): Promise<ChatMessage> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: authData } = await supabase.auth.getUser();
+    const user = authData?.user;
     if (!user) throw new Error("Usuário não autenticado.");
 
     let convo = await getConversationByContactId(contactId);

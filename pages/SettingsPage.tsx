@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
     getConnections, 
@@ -33,7 +34,7 @@ function SettingsPage(): React.ReactNode {
     setIsLoading(true);
     try {
         setConnections(await getConnections());
-        setActiveId(getActiveConnectionId());
+        setActiveId(await getActiveConnectionId());
     } catch (error) {
         console.error("Failed to load connections:", error);
         alert("Falha ao carregar conexões do banco de dados.");
@@ -70,7 +71,7 @@ function SettingsPage(): React.ReactNode {
     // Se esta for a primeira conexão, torna-a ativa
     const currentConnections = await getConnections();
     if (originalConnectionsCount === 0 && currentConnections.length > 0) {
-        handleConnect(currentConnections[0].id);
+        await handleConnect(currentConnections[0].id);
     } else {
        notifyConnectionChange();
     }
@@ -89,15 +90,15 @@ function SettingsPage(): React.ReactNode {
     }
   };
 
-  const handleConnect = (id: string) => {
-    setActiveConnectionId(id);
-    loadData();
+  const handleConnect = async (id: string) => {
+    await setActiveConnectionId(id);
+    await loadData();
     notifyConnectionChange();
   };
 
-  const handleDisconnect = () => {
-    disconnectActiveConnection();
-    loadData();
+  const handleDisconnect = async () => {
+    await disconnectActiveConnection();
+    await loadData();
     notifyConnectionChange();
   };
   

@@ -1,4 +1,5 @@
 
+
 import type { Campaign, CampaignLog, CampaignStatus, CampaignTarget } from '../types';
 import { supabase, type Json, type Database } from './supabaseClient';
 
@@ -57,7 +58,8 @@ export async function getCampaignById(id: number): Promise<Campaign | undefined>
 }
 
 export async function addCampaign(campaign: Omit<Campaign, 'id'>): Promise<Campaign> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: authData } = await supabase.auth.getUser();
+    const user = authData?.user;
     if (!user) throw new Error("Usuário não autenticado.");
 
     const campaignWithUser = { ...campaign, user_id: user.id };
