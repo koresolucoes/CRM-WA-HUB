@@ -1,89 +1,19 @@
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { Contact, CrmStage, SheetContact } from '../types';
 import { getContacts, addContact, updateContact, deleteContact, addMultipleContacts, parseCsv } from '../services/contactService';
 import { getAllStages } from '../services/crmService';
-import { PencilIcon, TrashIcon, XMarkIcon } from '../components/icons';
+import { PencilIcon, TrashIcon } from '../components/icons';
 import { searchService } from '../services/searchService';
 import { runAutomations } from '../services/automationService';
-
-const formFieldClasses = "w-full px-3 py-2 text-gray-700 bg-gray-100 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-amber-500 transition-colors duration-200";
+import { formFieldClasses } from '../components/ui/styleConstants';
+import { ContactModal } from '../components/Contacts/ContactModal';
+import { DeleteConfirmModal } from '../components/Contacts/DeleteConfirmModal';
 
 const EMPTY_CONTACT_FORM: Omit<Contact, 'id' | 'lastInteraction' | 'is24hWindowOpen'> = {
     name: '',
     phone: '',
     tags: [],
 };
-
-// --- Sub-componente de Input de Tags ---
-const TagInput = ({ selectedTags, allTags, onChange }: { selectedTags: string[], allTags: string[], onChange: (newTags: string[]) => void }) => {
-  const [inputValue, setInputValue] = useState('');
-  const [showSuggestions, setShowSuggestions] = useState(false);
-
-  const suggestions = allTags.filter(tag => 
-    !selectedTags.includes(tag) && 
-    tag.toLowerCase().includes(inputValue.toLowerCase())
-  );
-
-  const handleAddTag = (tag: string) => {
-    const trimmedTag = tag.trim();
-    if (trimmedTag && !selectedTags.includes(trimmedTag)) {
-      onChange([...selectedTags, trimmedTag]);
-    }
-    setInputValue('');
-    setShowSuggestions(false);
-  };
-
-  const handleRemoveTag = (tagToRemove: string) => {
-    onChange(selectedTags.filter(tag => tag !== tagToRemove));
-  };
-  
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && inputValue) {
-      e.preventDefault();
-      handleAddTag(inputValue);
-    }
-  };
-
-  return (
-    <div className="relative">
-      <div className={`${formFieldClasses} flex flex-wrap items-center gap-2`}>
-        {selectedTags.map(tag => (
-          <span key={tag} className="flex items-center gap-1 bg-amber-200 text-amber-800 text-sm font-medium px-2 py-1 rounded">
-            {tag}
-            <button type="button" onClick={() => handleRemoveTag(tag)} className="text-amber-600 hover:text-amber-800">
-              <XMarkIcon className="w-4 h-4" />
-            </button>
-          </span>
-        ))}
-        <input 
-          type="text"
-          value={inputValue}
-          onChange={e => setInputValue(e.target.value)}
-          onFocus={() => setShowSuggestions(true)}
-          onBlur={() => setTimeout(() => setShowSuggestions(false), 150)} // Delay para permitir o clique
-          onKeyDown={handleKeyDown}
-          className="flex-grow bg-transparent focus:outline-none p-1 min-w-[120px]"
-          placeholder="Adicionar tag..."
-        />
-      </div>
-      {showSuggestions && suggestions.length > 0 && (
-        <ul className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
-          {suggestions.map(tag => (
-            <li 
-              key={tag}
-              onMouseDown={() => handleAddTag(tag)} // onMouseDown executa antes do onBlur
-              className="px-3 py-2 cursor-pointer hover:bg-amber-100"
-            >
-              {tag}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-};
-
 
 function ContactsPage(): React.ReactNode {
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -385,48 +315,22 @@ function ContactsPage(): React.ReactNode {
         </table>
       </div>
 
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center">
-          <div className="bg-white rounded-lg p-8 w-full max-w-lg transform transition-all">
-            <h2 className="text-xl font-bold mb-6">{editingContact ? 'Editar Contato' : 'Adicionar Novo Contato'}</h2>
-            <form onSubmit={handleSaveContact} className="space-y-4">
-              <div>
-                <label htmlFor="name" className="block text-sm font-medium text-gray-700">Nome Completo</label>
-                <input type="text" name="name" id="name" value={formState.name} onChange={e => handleFormChange('name', e.target.value)} required className={`mt-1 ${formFieldClasses}`} />
-              </div>
-              <div>
-                <label htmlFor="phone" className="block text-sm font-medium text-gray-700">Telefone (com código do país)</label>
-                <input type="tel" name="phone" id="phone" value={formState.phone} onChange={e => handleFormChange('phone', e.target.value)} placeholder="+55 11 98765-4321" required className={`mt-1 ${formFieldClasses}`} />
-              </div>
-              <div>
-                <label htmlFor="tags" className="block text-sm font-medium text-gray-700 mb-1">Tags</label>
-                <TagInput
-                  selectedTags={formState.tags}
-                  allTags={allTags}
-                  onChange={(newTags) => handleFormChange('tags', newTags)}
-                />
-              </div>
-              <div className="flex justify-end space-x-4 pt-4">
-                <button type="button" onClick={handleCloseModals} className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition duration-300">Cancelar</button>
-                <button type="submit" className="px-4 py-2 text-white bg-amber-600 rounded-lg hover:bg-amber-700 transition duration-300">{editingContact ? 'Salvar Alterações' : 'Salvar Contato'}</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <ContactModal 
+        isOpen={isModalOpen}
+        onClose={handleCloseModals}
+        onSave={handleSaveContact}
+        editingContact={editingContact}
+        formState={formState}
+        handleFormChange={handleFormChange}
+        allTags={allTags}
+      />
       
-      {isDeleteModalOpen && contactToDelete && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center">
-          <div className="bg-white rounded-lg p-8 w-full max-w-md transform transition-all text-center">
-            <h2 className="text-xl font-bold mb-4">Confirmar Exclusão</h2>
-            <p className="text-gray-600 mb-6">Tem certeza que deseja remover o contato "{contactToDelete.name}"? Esta ação não pode ser desfeita.</p>
-            <div className="flex justify-center space-x-4">
-                <button onClick={handleCloseModals} className="px-6 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition duration-300">Cancelar</button>
-                <button onClick={handleDeleteContact} className="px-6 py-2 text-white bg-red-600 rounded-lg hover:bg-red-700 transition duration-300">Remover</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <DeleteConfirmModal 
+        isOpen={isDeleteModalOpen}
+        onClose={handleCloseModals}
+        onDelete={handleDeleteContact}
+        contactToDelete={contactToDelete}
+      />
     </div>
   );
 }

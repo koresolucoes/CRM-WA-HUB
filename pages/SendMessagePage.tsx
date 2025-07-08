@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { getContacts, addMultipleContacts } from '../services/contactService';
 import { getActiveConnection, getMessageTemplates, sendMessage, type MetaConnection } from '../services/metaService';
@@ -5,8 +6,7 @@ import { fetchAndParseSheet } from '../services/googleSheetService';
 import type { MessageTemplate, SheetContact, BodyComponent, Contact } from '../types';
 import { TableCellsIcon } from '../components/icons';
 import { runAutomations } from '../services/automationService';
-
-const formFieldClasses = "w-full px-3 py-2 text-gray-700 bg-gray-100 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-amber-500 transition-colors duration-200";
+import { formFieldClasses } from '../components/ui/styleConstants';
 
 type Notification = {
     type: 'success' | 'error' | 'info';

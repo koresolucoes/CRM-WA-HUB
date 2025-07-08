@@ -1,10 +1,11 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import type { Contact, Conversation } from '../../types';
 import { getContacts } from '../../services/contactService';
 import { getConversations } from '../../services/chatService';
 import InboxTabs, { type InboxFilter } from './InboxTabs';
 import { searchService } from '../../services/searchService';
+import { supabase } from '../../services/supabaseClient';
 
 interface ContactListProps {
   selectedContactId: number | null;
@@ -17,21 +18,44 @@ function ContactList({ selectedContactId, onSelectContact }: ContactListProps): 
   const [filter, setFilter] = useState<InboxFilter>('all');
   const [searchTerm, setSearchTerm] = useState(searchService.getSearchTerm());
 
-  const loadData = async () => {
-    setContacts(await getContacts());
-    setConversations(await getConversations());
-  };
-
   useEffect(() => {
-    loadData();
-    const unsubscribe = searchService.subscribe(setSearchTerm);
-    window.addEventListener('localDataChanged', loadData);
+    // Initial data load
+    const fetchData = async () => {
+        const [contactsData, conversationsData] = await Promise.all([
+            getContacts(),
+            getConversations()
+        ]);
+        setContacts(contactsData);
+        setConversations(conversationsData);
+    };
+    fetchData();
+
+    const unsubscribeSearch = searchService.subscribe(setSearchTerm);
+    
+    const channel = supabase
+      .channel('public-conversations-contact-list')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'conversations' },
+        (payload) => {
+          console.log('ContactList realtime update received', payload);
+          // Refetch conversations for simplicity and robustness.
+          getConversations().then(setConversations);
+
+          // Also check if we need to refresh the contacts list
+          const contactIdInPayload = payload.new?.contact_id;
+          if(contactIdInPayload && !contacts.some(c => c.id === contactIdInPayload)){
+              getContacts().then(setContacts);
+          }
+        }
+      )
+      .subscribe();
 
     return () => {
-        unsubscribe();
-        window.removeEventListener('localDataChanged', loadData);
+      unsubscribeSearch();
+      supabase.removeChannel(channel);
     };
-  }, []);
+  }, [contacts]); // Dependency on contacts ensures the closure has the latest list.
 
   const conversationDetails = useMemo(() => {
     return conversations

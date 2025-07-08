@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { Contact, Conversation } from '../../types';
 import { getContactById } from '../../services/contactService';
 import { getConversationByContactId, sendMessage, markAsRead } from '../../services/chatService';
 import MessageBox from './MessageBox';
 import { PaperAirplaneIcon } from '../icons';
+import { supabase } from '../../services/supabaseClient';
 
 interface ChatViewProps {
   contactId: number;
@@ -17,22 +19,46 @@ function ChatView({ contactId }: ChatViewProps): React.ReactNode {
   const [sendError, setSendError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setContact(await getContactById(contactId) || null);
     setConversation(await getConversationByContactId(contactId) || null);
     await markAsRead(contactId);
-  };
+  }, [contactId]);
   
   useEffect(() => {
-    loadData();
-    // Listen for general data changes (e.g., when a message is sent from this client)
-    // The chat will now only update on manual actions or reloads, not in real-time.
-    window.addEventListener('localDataChanged', loadData);
+    loadData(); // Initial load
 
+    const channel = supabase
+      .channel(`realtime-chat-for-contact-${contactId}`)
+      .on(
+          'postgres_changes',
+          {
+              event: '*', // Listen for INSERT and UPDATE
+              schema: 'public',
+              table: 'conversations',
+              filter: `contact_id=eq.${contactId}`,
+          },
+          (payload) => {
+              const updatedConvoData = payload.new as any;
+              if(updatedConvoData) {
+                  setConversation({
+                      contactId: updatedConvoData.contact_id,
+                      messages: updatedConvoData.messages,
+                      unreadCount: updatedConvoData.unread_count,
+                  });
+                  // Mark as read if the update came from the other side
+                  if (updatedConvoData.unread_count > 0) {
+                      markAsRead(contactId);
+                  }
+              }
+          }
+      )
+      .subscribe();
+    
     return () => {
-      window.removeEventListener('localDataChanged', loadData);
+        supabase.removeChannel(channel);
     };
-  }, [contactId]);
+  }, [contactId, loadData]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

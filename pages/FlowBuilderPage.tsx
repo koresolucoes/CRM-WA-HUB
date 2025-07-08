@@ -1,18 +1,22 @@
-
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getFlowById, updateFlow, saveDraftFlow, generateFlowPreview } from '../services/flowService';
-import type { WhatsAppFlow, FlowScreen, FlowComponent, FlowAction, FlowComponentType, FlowActionType, FlowDataSourceItem, CarouselImage } from '../types';
+import type { WhatsAppFlow, FlowScreen, FlowComponent, FlowComponentType } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import {
-    CheckCircleIcon, XCircleIcon, XMarkIcon, TrashIcon, PaperAirplaneIcon, PlusIcon,
-    PencilIcon, EyeIcon, ArrowUpIcon, ArrowDownIcon, Cog6ToothIcon, ArrowDownIcon as ArrowDownTrayIcon
+    XCircleIcon, XMarkIcon, TrashIcon, PaperAirplaneIcon, PlusIcon,
+    EyeIcon
 } from '../components/icons';
 import { FlowStatus } from '../types';
+import { slugify } from '../utils/slugify';
+import ComponentInspector from '../components/FlowBuilder/ComponentInspector';
+import ComponentToolbox from '../components/FlowBuilder/ComponentToolbox';
+import FlowPreview from '../components/FlowBuilder/FlowPreview';
+import NotificationToast from '../components/ui/NotificationToast';
+import InspectorField from '../components/FlowBuilder/ui/InspectorField';
+import { formFieldClasses } from '../components/ui/styleConstants';
 
-// --- Shared Styles & Types ---
-const formFieldClasses = "w-full px-3 py-2 text-sm text-gray-700 bg-gray-100 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-amber-500 transition-colors duration-200";
-
+// --- Types ---
 type Notification = {
     message: string;
     type: 'success' | 'error' | 'info';
@@ -21,438 +25,6 @@ type Notification = {
 
 type InspectorView = 'component' | 'screen' | 'flow';
 
-
-// --- Helper Functions ---
-const slugify = (text: string): string => {
-    if (!text) return '';
-    return text
-        .toString()
-        .toLowerCase()
-        .normalize('NFD') // split an accented letter in the base letter and the acent
-        .replace(/[\u0300-\u036f]/g, '') // remove all previously split accents
-        .replace(/\s+/g, '_')
-        .replace(/[^\w_]+/g, '')
-        .replace(/__+/g, '_')
-        .replace(/^_+/, '')
-        .replace(/_+$/, '');
-};
-
-
-// --- Sub-Components ---
-
-const InspectorField = ({ label, children, helpText }: { label: string, children: React.ReactNode, helpText?: string }) => (
-    <div>
-        <label className="block text-sm font-semibold text-gray-700 mb-1">{label}</label>
-        {children}
-        {helpText && <p className="text-xs text-gray-500 mt-1">{helpText}</p>}
-    </div>
-);
-
-const ActionEditor = ({ action, onChange, screens, title = "Ação ao Clicar" }: { action: FlowAction | undefined, onChange: (newAction: FlowAction | undefined) => void, screens: FlowScreen[], title?: string }) => {
-    const handleTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const newType = e.target.value as FlowActionType | '';
-        if (newType === '') {
-            onChange(undefined);
-        } else {
-            onChange({ type: newType });
-        }
-    };
-    
-    const updateActionProp = (key: keyof FlowAction, value: any) => {
-        if (!action) return;
-        onChange({ ...action, [key]: value });
-    };
-
-    return (
-        <div className="space-y-2 p-3 bg-gray-50 border rounded-md">
-            <InspectorField label={title}>
-                <select value={action?.type || ''} onChange={handleTypeChange} className={formFieldClasses}>
-                    <option value="">Nenhuma</option>
-                    <option value="Navigate">Navegar para Tela</option>
-                    <option value="Complete">Finalizar Flow</option>
-                    <option value="DataExchange">Trocar Dados (API)</option>
-                    <option value="open_url">Abrir URL</option>
-                    <option value="update_data">Atualizar Dados na Tela</option>
-                </select>
-            </InspectorField>
-            {action?.type === 'Navigate' && (
-                <InspectorField label="Tela de Destino">
-                    <select value={action.targetScreenId || ''} onChange={e => updateActionProp('targetScreenId', e.target.value)} className={formFieldClasses}>
-                        <option value="">Selecione a tela...</option>
-                        {screens.map(s => <option key={s.id} value={s.screen_id}>{s.title}</option>)}
-                    </select>
-                </InspectorField>
-            )}
-            {action?.type === 'open_url' && (
-                <InspectorField label="URL">
-                    <input type="url" value={action.url || ''} onChange={e => updateActionProp('url', e.target.value)} className={formFieldClasses} placeholder="https://example.com" />
-                </InspectorField>
-            )}
-        </div>
-    );
-}
-
-const DataSourceEditor = ({ dataSource = [], onChange }: { dataSource: FlowDataSourceItem[], onChange: (newDataSource: FlowDataSourceItem[]) => void }) => {
-    const updateItem = (index: number, prop: keyof FlowDataSourceItem, value: string) => {
-        const newItems = [...dataSource];
-        newItems[index] = { ...newItems[index], [prop]: value };
-        onChange(newItems);
-    };
-    const addItem = () => {
-        const newItem: FlowDataSourceItem = { id: `opcao_${dataSource.length + 1}`, title: 'Nova Opção' };
-        onChange([...dataSource, newItem]);
-    };
-    const removeItem = (index: number) => {
-        onChange(dataSource.filter((_, i) => i !== index));
-    };
-
-    return (
-        <div className="space-y-2">
-            {dataSource.map((item, index) => (
-                <div key={item.id} className="flex items-start space-x-2 bg-gray-50 p-2 rounded-md border">
-                    <div className="space-y-2 flex-grow">
-                        <input type="text" placeholder="ID da Opção" value={item.id} onChange={e => updateItem(index, 'id', e.target.value)} className={formFieldClasses} />
-                        <input type="text" placeholder="Título Visível" value={item.title} onChange={e => updateItem(index, 'title', e.target.value)} className={formFieldClasses} />
-                        <input type="text" placeholder="Descrição (opcional)" value={item.description || ''} onChange={e => updateItem(index, 'description', e.target.value)} className={formFieldClasses} />
-                    </div>
-                    <button onClick={() => removeItem(index)} className="p-2 text-gray-400 hover:text-red-500"><TrashIcon className="w-4 h-4" /></button>
-                </div>
-            ))}
-            <button onClick={addItem} className="text-sm font-semibold text-amber-600 hover:underline">+ Adicionar Opção</button>
-        </div>
-    );
-};
-
-const ImageCarouselEditor = ({ images = [], onChange }: { images: CarouselImage[], onChange: (newImages: CarouselImage[]) => void }) => {
-    const updateItem = (id: string, prop: keyof CarouselImage, value: string) => {
-        onChange(images.map(img => img.id === id ? { ...img, [prop]: value } : img));
-    };
-    const addItem = () => {
-        const newItem: CarouselImage = { id: uuidv4(), src: '', 'alt-text': 'Nova Imagem' };
-        onChange([...images, newItem]);
-    };
-    const removeItem = (id: string) => {
-        onChange(images.filter(img => img.id !== id));
-    };
-
-    return (
-        <div className="space-y-2">
-            {images.map((item) => (
-                <div key={item.id} className="flex items-start space-x-2 bg-gray-50 p-2 rounded-md border">
-                    <div className="space-y-2 flex-grow">
-                        <textarea placeholder="URL da Imagem (Base64)" value={item.src} onChange={e => updateItem(item.id, 'src', e.target.value)} className={`${formFieldClasses} h-16`} />
-                        <input type="text" placeholder="Texto Alternativo" value={item['alt-text']} onChange={e => updateItem(item.id, 'alt-text', e.target.value)} className={formFieldClasses} />
-                    </div>
-                    <button onClick={() => removeItem(item.id)} className="p-2 text-gray-400 hover:text-red-500"><TrashIcon className="w-4 h-4" /></button>
-                </div>
-            ))}
-            <button onClick={addItem} className="text-sm font-semibold text-amber-600 hover:underline">+ Adicionar Imagem</button>
-        </div>
-    );
-};
-
-
-const ComponentInspector = ({ component, onChange, onDelete, screens }: { component: FlowComponent; onChange: (id: string, prop: keyof FlowComponent, value: any) => void; onDelete: (id: string) => void; screens: FlowScreen[]; }) => {
-    const update = (prop: keyof FlowComponent, value: any) => onChange(component.id, prop, value);
-    const isConditionalVisibility = typeof component.visible === 'string';
-
-    const [isNameLocked, setIsNameLocked] = useState(true);
-
-    useEffect(() => {
-        // When label changes, if the name is "locked" (meaning, it's auto-generated), update it.
-        const labelOrText = component.label || component.text;
-        if (isNameLocked && typeof labelOrText === 'string' && labelOrText) {
-            const newName = slugify(labelOrText);
-            if (newName && newName !== component.name) {
-                update('name', newName);
-            }
-        }
-    }, [component.label, component.text, isNameLocked]);
-    
-    // Check on component change if the name looks like it was auto-generated from the label.
-     useEffect(() => {
-        const labelOrText = component.label || component.text;
-        const potentialSlug = typeof labelOrText === 'string' ? slugify(labelOrText) : '';
-        setIsNameLocked(!component.name || component.name === potentialSlug);
-    }, [component.id]);
-
-
-    const renderCommonFields = () => {
-        const showNameField = !['TextHeading', 'TextSubheading', 'TextBody', 'TextCaption', 'RichText', 'Image', 'Footer'].includes(component.type);
-        return (
-            <>
-                {showNameField && (
-                    <InspectorField label="Nome da Variável (API)" helpText="O nome único usado para referenciar este campo.">
-                         <div className="relative">
-                            <input
-                                type="text"
-                                value={component.name || ''}
-                                onChange={e => {
-                                    setIsNameLocked(false);
-                                    update('name', e.target.value);
-                                }}
-                                className={`${formFieldClasses} pr-8`}
-                                placeholder="ex: user_name"
-                            />
-                             <button
-                                onClick={() => setIsNameLocked(!isNameLocked)}
-                                title={isNameLocked ? "Desbloquear para editar manualmente" : "Bloquear para sincronizar com o rótulo"}
-                                className="absolute top-1/2 right-2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
-                            >
-                               {isNameLocked ? 
-                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5 text-amber-600"><path fillRule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clipRule="evenodd" /></svg>
-                                 :
-                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5"><path d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5a4.5 4.5 0 00-4.5-4.5zm-2 8V5.5a3 3 0 116 0V9h-6z" /></svg>
-                               }
-                             </button>
-                        </div>
-                    </InspectorField>
-                )}
-                <InspectorField label="Visibilidade do Componente">
-                    {isConditionalVisibility ? (
-                        <div className="space-y-1">
-                            <input type="text" value={component.visible as string} onChange={e => update('visible', e.target.value)} className={formFieldClasses} placeholder="${form.nome_do_campo.valor}"/>
-                            <p className="text-xs text-gray-500 mt-1">Exemplo: <code>{`${'${form.checkbox.valor}'} == true`}</code></p>
-                            <button onClick={() => update('visible', true)} className="text-xs text-red-600 hover:underline">Remover condição</button>
-                        </div>
-                    ) : (
-                        <div className="flex items-center justify-between">
-                            <label className="flex items-center cursor-pointer">
-                                <div className="relative">
-                                    <input type="checkbox" className="sr-only" checked={component.visible !== false} onChange={e => update('visible', e.target.checked)}/>
-                                    <div className={`block w-10 h-6 rounded-full transition-colors ${component.visible !== false ? 'bg-amber-500' : 'bg-gray-300'}`}></div>
-                                    <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${component.visible !== false ? 'translate-x-full' : ''}`}></div>
-                                </div>
-                                <span className="ml-3 text-sm font-medium text-gray-700">{component.visible !== false ? 'Visível' : 'Oculto'}</span>
-                            </label>
-                            <button onClick={() => update('visible', '')} className="text-xs text-amber-600 hover:underline font-semibold">Usar Condição</button>
-                        </div>
-                    )}
-                </InspectorField>
-            </>
-        );
-    };
-
-    const renderSpecificEditor = () => {
-        switch (component.type) {
-            case 'TextHeading':
-            case 'TextSubheading':
-            case 'TextBody':
-            case 'TextCaption':
-                return (
-                    <InspectorField label="Texto">
-                        <textarea value={Array.isArray(component.text) ? component.text.join('\n') : component.text || ''} onChange={e => update('text', e.target.value)} className={`${formFieldClasses} h-24`} />
-                    </InspectorField>
-                );
-
-            case 'RichText':
-                return (
-                    <InspectorField label="Conteúdo (Markdown)" helpText="Use a sintaxe Markdown para formatar o texto.">
-                        <textarea value={Array.isArray(component.text) ? component.text.join('\n') : component.text || ''} onChange={e => update('text', e.target.value)} className={`${formFieldClasses} h-48`} />
-                    </InspectorField>
-                );
-
-            case 'TextInput':
-            case 'TextArea':
-                return (
-                    <div className="space-y-4">
-                        <InspectorField label="Rótulo (Label)"><input type="text" value={component.label || ''} onChange={e => update('label', e.target.value)} className={formFieldClasses} /></InspectorField>
-                        <InspectorField label="Texto de Ajuda"><input type="text" value={component['helper-text'] || ''} onChange={e => update('helper-text', e.target.value)} className={formFieldClasses} /></InspectorField>
-                        {component.type === 'TextInput' && (
-                             <InspectorField label="Tipo de Entrada">
-                                <select value={component['input-type'] || 'text'} onChange={e => update('input-type', e.target.value)} className={formFieldClasses}>
-                                    <option value="text">Texto</option><option value="number">Número</option><option value="email">Email</option><option value="password">Senha</option><option value="passcode">Código de Acesso</option><option value="phone">Telefone</option>
-                                </select>
-                            </InspectorField>
-                        )}
-                        <InspectorField label="Obrigatório?"><input type="checkbox" checked={component.required || false} onChange={e => update('required', e.target.checked)} className="h-5 w-5 rounded text-amber-600 focus:ring-amber-500" /></InspectorField>
-                    </div>
-                );
-
-            case 'CheckboxGroup':
-            case 'RadioButtonsGroup':
-            case 'Dropdown':
-            case 'ChipsSelector':
-                 return (
-                    <div className="space-y-4">
-                        <InspectorField label="Rótulo (Label)"><input type="text" value={component.label || ''} onChange={e => update('label', e.target.value)} className={formFieldClasses} /></InspectorField>
-                        <InspectorField label="Opções do Componente">
-                           <DataSourceEditor dataSource={component['data-source']} onChange={ds => update('data-source', ds)} />
-                        </InspectorField>
-                         {component.type === 'CheckboxGroup' && (
-                            <InspectorField label="Seleção de Itens">
-                                <div className="flex items-center space-x-2">
-                                     <input type="number" placeholder="Mín" value={component['min-selected-items'] || ''} onChange={e => update('min-selected-items', e.target.value ? parseInt(e.target.value) : undefined)} className={formFieldClasses} />
-                                      <input type="number" placeholder="Máx" value={component['max-selected-items'] || ''} onChange={e => update('max-selected-items', e.target.value ? parseInt(e.target.value) : undefined)} className={formFieldClasses} />
-                                </div>
-                            </InspectorField>
-                         )}
-                    </div>
-                 );
-
-            case 'Footer':
-                return (
-                    <div className="space-y-4">
-                        <InspectorField label="Rótulo do Botão"><input type="text" value={component.label || ''} onChange={e => update('label', e.target.value)} className={formFieldClasses} /></InspectorField>
-                        <InspectorField label="Legendas (Opcional)">
-                             <div className="space-y-2">
-                                <input type="text" placeholder="Legenda Esquerda" value={component['left-caption'] || ''} onChange={e => update('left-caption', e.target.value)} className={formFieldClasses} />
-                                <input type="text" placeholder="Legenda Direita" value={component['right-caption'] || ''} onChange={e => update('right-caption', e.target.value)} className={formFieldClasses} />
-                            </div>
-                        </InspectorField>
-                        <ActionEditor action={component['on-click-action']} onChange={(newAction) => update('on-click-action', newAction)} screens={screens}/>
-                    </div>
-                );
-            
-            case 'ImageCarousel':
-                return (
-                    <div className="space-y-4">
-                        <InspectorField label="Imagens do Carrossel">
-                            <ImageCarouselEditor images={component.images} onChange={imgs => update('images', imgs)} />
-                        </InspectorField>
-                        <InspectorField label="Proporção da Imagem">
-                            <select value={component['aspect-ratio']?.toString() || '1.91'} onChange={e => update('aspect-ratio', e.target.value)} className={formFieldClasses}>
-                                <option value="1.91">Horizontal (1.91:1)</option>
-                                <option value="1">Quadrado (1:1)</option>
-                            </select>
-                        </InspectorField>
-                    </div>
-                );
-            
-            case 'DatePicker':
-                 return (
-                     <div className="space-y-4">
-                         <InspectorField label="Rótulo (Label)"><input type="text" value={component.label || ''} onChange={e => update('label', e.target.value)} className={formFieldClasses} /></InspectorField>
-                         <InspectorField label="Data Mínima"><input type="date" value={component['min-date'] || ''} onChange={e => update('min-date', e.target.value)} className={formFieldClasses} /></InspectorField>
-                         <InspectorField label="Data Máxima"><input type="date" value={component['max-date'] || ''} onChange={e => update('max-date', e.target.value)} className={formFieldClasses} /></InspectorField>
-                    </div>
-                 );
-
-            default:
-                return <p className="text-sm text-gray-500">Editor para '{component.type}' ainda não implementado.</p>
-        }
-    };
-    
-    return (
-        <div>
-            <div className="flex justify-between items-center mb-4">
-                <h2 className="font-bold text-lg">{component.type.replace(/([A-Z])/g, ' $1').trim()}</h2>
-                <button onClick={() => onDelete(component.id)} className="p-1 text-gray-400 hover:text-red-500"><TrashIcon className="w-5 h-5"/></button>
-            </div>
-            <div className="space-y-4">
-                {renderCommonFields()}
-                {renderSpecificEditor()}
-            </div>
-        </div>
-    );
-};
-
-const ComponentToolbox = ({ onAddComponent }: { onAddComponent: (type: FlowComponentType) => void }) => {
-    const componentGroups = [
-        { name: "Texto", components: [
-            { id: "TextHeading", label: "Título" }, { id: "TextSubheading", label: "Subtítulo" },
-            { id: "TextBody", label: "Corpo" }, { id: "TextCaption", label: "Legenda" }, { id: "RichText", label: "Texto Rico" },
-        ]},
-        { name: "Entradas", components: [
-            { id: "TextInput", label: "Campo de Texto" }, { id: "TextArea", label: "Área de Texto" },
-            { id: "CheckboxGroup", label: "Grupo de Checkbox" }, { id: "RadioButtonsGroup", label: "Botões de Rádio" },
-            { id: "Dropdown", label: "Dropdown" }, { id: "DatePicker", label: "Seletor de Data" },
-            { id: "CalendarPicker", label: "Calendário" }, { id: "ChipsSelector", label: "Chips" }, { id: "OptIn", label: "Opt-In" },
-        ]},
-         { name: "Mídia", components: [
-            { id: "Image", label: "Imagem" }, { id: "ImageCarousel", label: "Carrossel" },
-            { id: "PhotoPicker", label: "Upload de Foto" }, { id: "DocumentPicker", label: "Upload de Doc" },
-        ]},
-        { name: "Ações", components: [
-            { id: "Footer", label: "Rodapé com Botão" }, { id: "EmbeddedLink", label: "Link Incorporado" },
-        ]}
-    ];
-
-    return (
-        <div className="space-y-4">
-            {componentGroups.map(group => (
-                <div key={group.name}>
-                    <h3 className="font-semibold text-sm text-gray-600 mb-2">{group.name}</h3>
-                    <div className="grid grid-cols-2 gap-2">
-                        {group.components.map(comp => (
-                            <button key={comp.id} onClick={() => onAddComponent(comp.id as FlowComponentType)} className="text-left p-2 rounded-md border bg-white hover:border-amber-500 hover:bg-amber-50 transition-all">
-                                <span className="font-medium text-sm">{comp.label}</span>
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            ))}
-        </div>
-    );
-};
-
-
-const FlowPreview = ({ screen, flowName }: { screen: FlowScreen | undefined, flowName: string }) => {
-    if (!screen) {
-        return (
-            <div className="w-full max-w-sm bg-gray-900 rounded-3xl p-2 shadow-2xl sticky top-8 mx-auto flex items-center justify-center">
-                <p className="text-white">Selecione uma tela para ver a pré-visualização.</p>
-            </div>
-        );
-    }
-    return (
-        <div className="w-full max-w-sm bg-gray-900 rounded-3xl p-2 shadow-2xl sticky top-8 mx-auto">
-            <div className="bg-white rounded-2xl overflow-hidden">
-                <div className="h-14 bg-teal-600 flex items-center p-3 text-white">
-                    <div className="w-8 h-8 bg-gray-200 rounded-full mr-3 flex-shrink-0"></div>
-                    <p className="font-semibold">{flowName}</p>
-                </div>
-                <div className="p-2 bg-cover" style={{ backgroundImage: "url('https://i.pinimg.com/736x/8c/98/99/8c98994518b575bfd8c949e91d20548b.jpg')" }}>
-                    <div className="bg-white p-3 rounded-lg shadow-md max-w-full self-start mb-auto text-left w-full min-h-[400px]">
-                        {screen.layout.children.map(comp => {
-                           if(comp.visible === false) return null;
-                           return (
-                            <div key={comp.id} className="mb-3 text-sm">
-                                {comp.type === 'TextHeading' && <h3 className="font-bold text-lg">{comp.text || `[Título]`}</h3>}
-                                {comp.type === 'TextSubheading' && <h4 className="font-semibold text-base">{comp.text || `[Subtítulo]`}</h4>}
-                                {comp.type === 'TextBody' && <p>{comp.text || `[Corpo]`}</p>}
-                                {comp.type === 'TextCaption' && <p className="text-xs text-gray-500">{comp.text || `[Legenda]`}</p>}
-                                {comp.type === 'TextInput' && <div className="p-2 border rounded bg-gray-50">{comp.label || '[Campo de Texto]'}</div>}
-                                {comp.type === 'TextArea' && <div className="p-2 h-16 border rounded bg-gray-50">{comp.label || '[Área de Texto]'}</div>}
-                                {comp.type === 'Dropdown' && <div className="p-2 border rounded bg-gray-50">{comp.label || '[Dropdown]'}</div>}
-                                {comp.type === 'Footer' && <div className="p-2 bg-gray-200 text-center rounded mt-4">{comp.label || '[Botão de Rodapé]'}</div>}
-                                {comp.type === 'Image' && <div className="h-24 bg-gray-200 flex items-center justify-center text-gray-400 rounded-md">Imagem</div>}
-                            </div>
-                           )}
-                        )}
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const NotificationToast = ({ notification, onClose }: { notification: Notification; onClose: () => void }) => {
-    useEffect(() => {
-        const timer = setTimeout(onClose, 8000);
-        return () => clearTimeout(timer);
-    }, [onClose]);
-
-    const isSuccess = notification.type === 'success';
-    const isError = notification.type === 'error';
-    const Icon = isSuccess ? CheckCircleIcon : isError ? XCircleIcon : CheckCircleIcon;
-    const colors = isSuccess ? 'bg-green-100 border-green-500 text-green-800' : isError ? 'bg-red-100 border-red-500 text-red-800' : 'bg-blue-100 border-blue-500 text-blue-800';
-
-    return (
-        <div className={`fixed top-5 right-5 max-w-sm w-full p-4 rounded-lg border-l-4 shadow-lg z-50 flex items-start transition-all animate-fade-in-right ${colors}`}>
-            <div className="flex-shrink-0"><Icon className="h-5 w-5" /></div>
-            <div className="ml-3 w-0 flex-1 pt-0.5">
-                <p className="text-sm font-medium">{notification.message}</p>
-                {notification.details && (
-                    <ul className="mt-2 list-disc list-inside text-xs">
-                        {notification.details.map((detail, i) => <li key={i}>{detail}</li>)}
-                    </ul>
-                )}
-            </div>
-            <button onClick={onClose} className="ml-4 flex-shrink-0 flex"><XMarkIcon className="h-5 w-5" /></button>
-        </div>
-    );
-};
 
 // --- Main Page Component ---
 
@@ -470,7 +42,7 @@ export default function FlowBuilderPage() {
     const [isTesting, setIsTesting] = useState(false);
     const [notification, setNotification] = useState<Notification | null>(null);
     
-    const debouncedSave = useRef<NodeJS.Timeout | null>(null);
+    const debouncedSave = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Initial Load and screen selection logic
     useEffect(() => {
@@ -487,8 +59,6 @@ export default function FlowBuilderPage() {
                     return;
                 }
                 
-                // If a Meta-synced flow has no local content, create a default screen.
-                // This makes the flow editable immediately without a network call to Meta that might fail.
                 if (data.origin === 'meta' && data.screens.length === 0) {
                     const newScreen: FlowScreen = {
                         id: uuidv4(),
@@ -498,7 +68,6 @@ export default function FlowBuilderPage() {
                     };
                     const updatedFlowData = { ...data, screens: [newScreen] };
                     
-                    // Save it back to prevent re-running this logic on subsequent loads.
                     const savedFlow = await updateFlow(updatedFlowData); 
                     
                     setFlow(savedFlow);
@@ -523,10 +92,9 @@ export default function FlowBuilderPage() {
         if (flow) {
             if (debouncedSave.current) clearTimeout(debouncedSave.current);
             debouncedSave.current = setTimeout(() => {
-                if (flow.status !== FlowStatus.PUBLISHED) { // Avoid saving published flows automatically
+                if (flow.status !== FlowStatus.PUBLISHED) {
                     updateFlow(flow).catch(err => {
                         console.error("Auto-save failed:", err);
-                        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
                         setNotification({ type: 'error', message: `Falha ao salvar rascunho.` });
                     });
                 }
@@ -662,9 +230,7 @@ export default function FlowBuilderPage() {
         setIsTesting(true);
         setNotification(null);
         try {
-            // First, ensure the latest changes are saved to the backend
             await updateFlow(flow);
-            // Then, generate the preview URL
             const previewUrl = await generateFlowPreview(flow.id);
             window.open(previewUrl, '_blank');
             setNotification({ type: 'info', message: 'URL de pré-visualização gerada e aberta em uma nova aba.' });

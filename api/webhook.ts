@@ -3,7 +3,7 @@
 // e acionar quaisquer automações relevantes.
 
 import { supabase } from '../services/supabaseClient';
-import { getContacts } from '../services/contactService';
+import { getContacts, addContact } from '../services/contactService';
 import { addMessage } from '../services/chatService';
 import { runAutomations } from '../services/automationService';
 
@@ -39,6 +39,9 @@ export default async function handler(req: any, res: any) {
       for (const entry of body.entry) {
         for (const change of entry.changes) {
           if (change.field === 'messages' && change.value.messages) {
+            
+            const allContacts = await getContacts();
+            
             for (const message of change.value.messages) {
               // We only care about incoming text messages for now.
               if (message.type === 'text') {
@@ -46,23 +49,31 @@ export default async function handler(req: any, res: any) {
                 const text = message.text.body;
 
                 try {
-                  // This logic was previously in chatService.receiveMessage
-                  const allContacts = await getContacts();
-                  const contact = allContacts.find(c => c.phone.replace(/\D/g, '') === contactPhone.replace(/\D/g, ''));
+                  let contact = allContacts.find(c => c.phone && c.phone.replace(/\D/g, '') === contactPhone.replace(/\D/g, ''));
                   
-                  if (contact) {
-                      // Add message to the conversation in the database
-                      await addMessage(contact.id, {
-                          text,
-                          sender: 'contact',
-                          status: 'delivered',
-                      });
-                      // Trigger any automations based on the message content
-                      await runAutomations('context_message', { contactId: contact.id, messageText: text });
-                      console.log(`Successfully processed message from ${contactPhone}`);
-                  } else {
-                      console.warn(`Received message from unknown number: ${contactPhone}. Contact not found in DB.`);
+                  if (!contact) {
+                    const contactName = change.value.contacts?.[0]?.profile?.name || `Novo Contato ${contactPhone.slice(-4)}`;
+                    console.log(`Creating new contact for ${contactPhone} with name ${contactName}`);
+                    
+                    contact = await addContact({
+                        phone: contactPhone,
+                        name: contactName,
+                        tags: ['novo-contato-webhook']
+                    });
+                    
+                    await runAutomations('contact_created', { contactId: contact.id });
+                    await runAutomations('tag_added', { contactId: contact.id, tagName: 'novo-contato-webhook' });
                   }
+                  
+                  // Now contact is guaranteed to exist
+                  await addMessage(contact.id, {
+                      text,
+                      sender: 'contact',
+                      status: 'delivered',
+                  });
+                  await runAutomations('context_message', { contactId: contact.id, messageText: text });
+                  console.log(`Successfully processed message from ${contactPhone}`);
+
                 } catch (error) {
                    console.error(`Failed to process incoming message from ${contactPhone}:`, error);
                    // Still return 200 to Meta, as we've received it. The issue is internal processing.

@@ -3,219 +3,14 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getTemplateById, updateTemplate, deleteTemplate } from '../services/templateService';
 import { createMessageTemplate, getActiveConnection } from '../services/metaService';
-import { CheckCircleIcon, XCircleIcon, XMarkIcon, TrashIcon, PaperAirplaneIcon } from '../components/icons';
-import type { MessageTemplate, TemplateComponent, HeaderComponent, BodyComponent, FooterComponent, ButtonsComponent, Button, UrlButton } from '../types';
-import { v4 as uuidv4 } from 'uuid';
-
-type Notification = {
-    message: string;
-    type: 'success' | 'error';
-};
-
-const formFieldClasses = "w-full px-3 py-2 text-gray-700 bg-gray-100 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-amber-500 transition-colors duration-200";
-const formSelectClasses = `${formFieldClasses} appearance-none`;
-
-
-// --- Sub-components for each section of the builder ---
-
-const HeaderEditor = ({ component, onChange }: { component: HeaderComponent | undefined, onChange: (newComponent: HeaderComponent | undefined) => void }) => {
-    if (!component) return null;
-
-    return (
-        <div className="space-y-3">
-            <select value={component.format} onChange={e => onChange({ ...component, format: e.target.value as HeaderComponent['format'] })} className={formSelectClasses}>
-                <option value="TEXT">Texto</option>
-                <option value="IMAGE">Imagem</option>
-                <option value="VIDEO">Vídeo</option>
-                <option value="DOCUMENT">Documento</option>
-            </select>
-            {component.format === 'TEXT' ? (
-                <input
-                    type="text"
-                    value={component.text || ''}
-                    onChange={e => onChange({ ...component, text: e.target.value })}
-                    placeholder="Texto do cabeçalho (use {{1}} para uma variável)"
-                    className={formFieldClasses}
-                />
-            ) : (
-                <input
-                    type="text"
-                    value={component.example?.header_handle?.[0] || ''}
-                    onChange={e => onChange({ ...component, example: { header_handle: [e.target.value] } })}
-                    placeholder={`URL de exemplo do ${component.format.toLowerCase()}`}
-                    className={formFieldClasses}
-                />
-            )}
-        </div>
-    );
-};
-
-const BodyEditor = ({ component, onChange }: { component: BodyComponent, onChange: (newComponent: BodyComponent) => void }) => {
-    const textareaRef = React.useRef<HTMLTextAreaElement>(null);
-
-    const addVariable = () => {
-        if (textareaRef.current) {
-            const currentText = textareaRef.current.value;
-            const selectionStart = textareaRef.current.selectionStart;
-            const selectionEnd = textareaRef.current.selectionEnd;
-            const variableRegex = /\{\{(\d+)\}\}/g;
-            let maxVar = 0;
-            let match;
-            while ((match = variableRegex.exec(currentText)) !== null) {
-                maxVar = Math.max(maxVar, parseInt(match[1]));
-            }
-            const newVar = `{{${maxVar + 1}}}`;
-            const newText = currentText.substring(0, selectionStart) + newVar + currentText.substring(selectionEnd);
-            onChange({ ...component, text: newText });
-        }
-    };
-    
-    return (
-        <div className="relative">
-            <textarea
-                ref={textareaRef}
-                value={component.text}
-                onChange={e => onChange({ ...component, text: e.target.value })}
-                className={`${formFieldClasses} h-48`}
-                placeholder="Corpo da mensagem..."
-            />
-            <button onClick={addVariable} type="button" className="absolute bottom-3 right-3 text-xs bg-amber-100 text-amber-700 font-semibold px-2 py-1 rounded-md hover:bg-amber-200">
-                + Adicionar Variável
-            </button>
-        </div>
-    );
-};
-
-const FooterEditor = ({ component, onChange }: { component: FooterComponent, onChange: (newComponent: FooterComponent) => void }) => (
-    <input type="text" value={component.text} onChange={e => onChange({ ...component, text: e.target.value })} placeholder="Texto do rodapé" className={formFieldClasses} />
-);
-
-const ButtonsEditor = ({ component, onChange }: { component: ButtonsComponent, onChange: (newComponent: ButtonsComponent) => void }) => {
-    const handleButtonChange = (index: number, updatedButton: Button) => {
-        const newButtons = [...component.buttons];
-        newButtons[index] = updatedButton;
-        onChange({ ...component, buttons: newButtons });
-    };
-
-    const handleAddButton = () => {
-        const buttonType = component.buttons[0]?.type || 'QUICK_REPLY';
-        let newButton: Button;
-        if (buttonType === 'QUICK_REPLY') {
-            newButton = { type: 'QUICK_REPLY', text: 'Nova Resposta' };
-        } else {
-            newButton = { type: 'URL', text: 'Visitar Site', url: 'https://' };
-        }
-        onChange({ ...component, buttons: [...component.buttons, newButton] });
-    };
-
-    const handleRemoveButton = (index: number) => {
-        const newButtons = component.buttons.filter((_, i) => i !== index);
-        onChange({ ...component, buttons: newButtons });
-    };
-
-    const setButtonType = (type: 'QUICK_REPLY' | 'URL') => {
-        if (type === 'QUICK_REPLY') {
-            onChange({ ...component, buttons: [{ type: 'QUICK_REPLY', text: 'Resposta Rápida' }] });
-        } else {
-            onChange({ ...component, buttons: [{ type: 'URL', text: 'Visitar Site', url: 'https://' }] });
-        }
-    };
-    
-    const canAddButton = (component.buttons[0]?.type === 'QUICK_REPLY' && component.buttons.length < 10) ||
-                         (component.buttons[0]?.type !== 'QUICK_REPLY' && component.buttons.length < 2);
-
-    return (
-        <div className="space-y-4">
-            <div className="flex items-center space-x-2">
-                <button type="button" onClick={() => setButtonType('QUICK_REPLY')} className={`px-3 py-1 text-sm rounded-md ${component.buttons[0]?.type === 'QUICK_REPLY' ? 'bg-amber-600 text-white' : 'bg-gray-200'}`}>Respostas Rápidas</button>
-                <button type="button" onClick={() => setButtonType('URL')} className={`px-3 py-1 text-sm rounded-md ${component.buttons[0]?.type !== 'QUICK_REPLY' ? 'bg-amber-600 text-white' : 'bg-gray-200'}`}>Chamada para Ação</button>
-            </div>
-            
-            {component.buttons.map((btn, index) => (
-                <div key={index} className="p-3 bg-gray-50 rounded-lg space-y-2 relative">
-                    <button onClick={() => handleRemoveButton(index)} type="button" className="absolute top-2 right-2 p-1 text-gray-400 hover:text-red-500"><TrashIcon className="w-4 h-4"/></button>
-                    {btn.type === 'QUICK_REPLY' && (
-                        <input type="text" value={btn.text} onChange={e => handleButtonChange(index, { ...btn, text: e.target.value })} placeholder="Texto da Resposta Rápida" className={formFieldClasses} />
-                    )}
-                    {btn.type === 'URL' && (
-                        <div className="space-y-2">
-                            <input type="text" value={btn.text} onChange={e => handleButtonChange(index, { ...btn, text: e.target.value })} placeholder="Texto do Botão" className={formFieldClasses} />
-                            <input type="url" value={btn.url} onChange={e => handleButtonChange(index, { ...btn, url: e.target.value })} placeholder="https://exemplo.com" className={formFieldClasses} />
-                        </div>
-                    )}
-                    {btn.type === 'PHONE_NUMBER' && (
-                         <div className="space-y-2">
-                            <input type="text" value={btn.text} onChange={e => handleButtonChange(index, { ...btn, text: e.target.value })} placeholder="Texto do Botão" className={formFieldClasses} />
-                            <input type="tel" value={btn.phone_number} onChange={e => handleButtonChange(index, { ...btn, phone_number: e.target.value })} placeholder="+5511999999999" className={formFieldClasses} />
-                        </div>
-                    )}
-                </div>
-            ))}
-
-            {canAddButton && <button type="button" onClick={handleAddButton} className="text-sm text-amber-600 hover:underline">+ Adicionar Botão</button>}
-        </div>
-    );
-};
-
-const TemplatePreview = ({ template }: { template: MessageTemplate | null }) => {
-    if (!template) return null;
-
-    const header = template.components.find(c => c.type === 'HEADER') as HeaderComponent | undefined;
-    const body = template.components.find(c => c.type === 'BODY') as BodyComponent;
-    const footer = template.components.find(c => c.type === 'FOOTER') as FooterComponent | undefined;
-    const buttons = template.components.find(c => c.type === 'BUTTONS') as ButtonsComponent | undefined;
-
-    return (
-        <div className="w-full max-w-sm bg-gray-900 rounded-3xl p-2 shadow-2xl sticky top-8 mx-auto">
-            <div className="bg-white rounded-2xl overflow-hidden">
-                <div className="h-14 bg-teal-600 flex items-center p-3 text-white">
-                    <div className="w-8 h-8 bg-gray-200 rounded-full mr-3 flex-shrink-0"></div>
-                    <p className="font-semibold">Preview</p>
-                </div>
-                <div className="p-2 bg-cover" style={{ backgroundImage: "url('https://i.pinimg.com/736x/8c/98/99/8c98994518b575bfd8c949e91d20548b.jpg')" }}>
-                    <div className="bg-white p-3 rounded-lg shadow-md max-w-full self-start mb-auto text-left w-full">
-                        {header && (
-                            <div className="mb-2">
-                                {header.format === 'TEXT' && <p className="font-bold text-gray-800 break-words">{header.text || 'Cabeçalho'}</p>}
-                                {header.format === 'IMAGE' && <div className="h-32 bg-gray-200 flex items-center justify-center text-gray-400 rounded-md">Imagem</div>}
-                                {header.format === 'VIDEO' && <div className="h-32 bg-gray-200 flex items-center justify-center text-gray-400 rounded-md">Vídeo</div>}
-                                {header.format === 'DOCUMENT' && <div className="h-16 bg-gray-200 flex items-center justify-center text-gray-400 rounded-md">Documento</div>}
-                            </div>
-                        )}
-                        <p className="text-sm text-gray-800 whitespace-pre-wrap break-words">{body.text}</p>
-                        {footer && <p className="text-xs text-gray-500 mt-2">{footer.text}</p>}
-                    </div>
-                    {buttons && buttons.buttons.length > 0 && (
-                        <div className="mt-2 space-y-1">
-                            {buttons.buttons.map((btn, i) => (
-                                <div key={i} className="bg-gray-100 text-center text-sm text-blue-600 p-2 rounded-lg cursor-pointer">
-                                    {btn.text}
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const NotificationToast = ({ notification, onClose }: { notification: Notification; onClose: () => void }) => {
-    useEffect(() => {
-        const timer = setTimeout(onClose, 5000);
-        return () => clearTimeout(timer);
-    }, [onClose]);
-
-    const isSuccess = notification.type === 'success';
-    return (
-        <div className={`fixed top-5 right-5 max-w-sm w-full p-4 rounded-lg border-l-4 shadow-lg z-50 flex items-start transition-all animate-fade-in-right ${isSuccess ? 'bg-green-100 border-green-500 text-green-800' : 'bg-red-100 border-red-500 text-red-800'}`}>
-            <div className="flex-shrink-0">{isSuccess ? <CheckCircleIcon className="h-5 w-5" /> : <XCircleIcon className="h-5 w-5" />}</div>
-            <div className="ml-3 w-0 flex-1 pt-0.5"><p className="text-sm font-medium">{notification.message}</p></div>
-            <button onClick={onClose} className="ml-4 flex-shrink-0 flex"><XMarkIcon className="h-5 w-5" /></button>
-        </div>
-    );
-};
-
+import { PaperAirplaneIcon } from '../components/icons';
+import type { MessageTemplate, TemplateComponent, HeaderComponent, BodyComponent, FooterComponent, ButtonsComponent } from '../types';
+import NotificationToast, { type Notification } from '../components/ui/NotificationToast';
+import HeaderEditor from '../components/TemplateBuilder/HeaderEditor';
+import BodyEditor from '../components/TemplateBuilder/BodyEditor';
+import FooterEditor from '../components/TemplateBuilder/FooterEditor';
+import ButtonsEditor from '../components/TemplateBuilder/ButtonsEditor';
+import TemplatePreview from '../components/TemplateBuilder/TemplatePreview';
 
 // --- Main Page Component ---
 
@@ -342,13 +137,13 @@ export default function TemplateBuilderPage() {
                     <div className="bg-white p-6 rounded-lg shadow-sm border">
                         <h2 className="text-lg font-bold mb-4">Informações Básicas</h2>
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                            <input type="text" value={template.name} onChange={e => handleTemplateChange('name', e.target.value)} placeholder="Nome do modelo" className={formFieldClasses} />
-                             <select value={template.category} onChange={e => handleTemplateChange('category', e.target.value)} className={formSelectClasses}>
+                            <input type="text" value={template.name} onChange={e => handleTemplateChange('name', e.target.value)} placeholder="Nome do modelo" className="w-full px-3 py-2 text-gray-700 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                             <select value={template.category} onChange={e => handleTemplateChange('category', e.target.value)} className="w-full px-3 py-2 text-gray-700 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 appearance-none">
                                 <option value="MARKETING">Marketing</option>
                                 <option value="UTILITY">Utilidade</option>
                                 <option value="AUTHENTICATION">Autenticação</option>
                             </select>
-                            <input type="text" value={template.language} onChange={e => handleTemplateChange('language', e.target.value)} placeholder="Idioma (ex: pt_BR)" className={formFieldClasses} />
+                            <input type="text" value={template.language} onChange={e => handleTemplateChange('language', e.target.value)} placeholder="Idioma (ex: pt_BR)" className="w-full px-3 py-2 text-gray-700 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500" />
                         </div>
                     </div>
                     

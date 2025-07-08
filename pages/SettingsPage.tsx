@@ -10,6 +10,7 @@ import {
     testConnection,
     type MetaConnection 
 } from '../services/metaService';
+import { formFieldClasses } from '../components/ui/styleConstants';
 
 type TestResult = {
     id: string;
@@ -19,7 +20,6 @@ type TestResult = {
 }
 
 const emptyConnection: Omit<MetaConnection, 'id'> = { name: '', wabaId: '', phoneNumberId: '', apiToken: '' };
-const formFieldClasses = "w-full px-3 py-2 text-gray-700 bg-gray-100 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-amber-500 transition-colors duration-200";
 
 function SettingsPage(): React.ReactNode {
   const [connections, setConnections] = useState<MetaConnection[]>([]);
