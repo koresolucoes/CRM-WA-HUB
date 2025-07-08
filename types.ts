@@ -1,6 +1,6 @@
 
 
-import type React from 'react';
+import React from 'react';
 
 export enum CampaignStatus {
   CONCLUIDA = 'Concluída',
@@ -38,6 +38,7 @@ export interface Campaign {
 
 export interface Contact {
   id: number;
+  user_id: string;
   name: string;
   phone: string;
   tags: string[];
@@ -517,6 +518,7 @@ export interface AutomationEdge {
 
 export interface Automation {
     id: string;
+    user_id: string;
     name: string;
     status: AutomationStatus;
     nodes: AutomationNode[];

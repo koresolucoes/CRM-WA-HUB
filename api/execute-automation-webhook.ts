@@ -1,8 +1,8 @@
 // api/execute-automation-webhook.ts
-import { updateAutomation } from '../../services/automationService';
-import { runAutomations } from '../../services/automationService';
-import { supabaseAdmin } from '../../services/supabaseAdminClient';
-import type { Automation, TriggerWebhookData } from '../../types';
+import { updateAutomation } from '../services/automationService';
+import { runAutomations } from '../services/automationService';
+import { supabaseAdmin } from '../services/supabaseAdminClient';
+import type { Automation, TriggerWebhookData } from '../types';
 
 export default async function handler(req: any, res: any) {
     if (req.method !== 'POST') {
@@ -13,6 +13,10 @@ export default async function handler(req: any, res: any) {
     const webhookId = req.query.id as string;
     if (!webhookId) {
         return res.status(400).json({ success: false, message: 'Webhook ID is missing in query parameter "id".' });
+    }
+
+    if (!supabaseAdmin) {
+        return res.status(500).json({ success: false, message: 'Backend client not configured.' });
     }
 
     const body = req.body;
