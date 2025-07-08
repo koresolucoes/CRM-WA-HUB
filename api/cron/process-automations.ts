@@ -1,3 +1,4 @@
+
 // This serverless function is intended to be run on a schedule (e.g., every minute via Vercel Cron Jobs).
 // It queries for pending automation tasks and executes them.
 // To secure this endpoint, set a CRON_SECRET environment variable in your Vercel project.
@@ -50,7 +51,8 @@ export default async function handler(req: any, res: any) {
         for (const task of tasks) {
             try {
                 // Mark task as 'processing' to prevent duplicate runs
-                await supabaseAdmin.from('scheduled_automation_tasks').update({ status: 'processing' }).eq('id', task.id);
+                const processingPayload: Database['public']['Tables']['scheduled_automation_tasks']['Update'] = { status: 'processing' };
+                await supabaseAdmin.from('scheduled_automation_tasks').update(processingPayload).eq('id', task.id);
                 
                 // Fetch all data using the admin client
                 const [automationRes, contactRes, connectionRes] = await Promise.all([
@@ -84,7 +86,8 @@ export default async function handler(req: any, res: any) {
                         task.resume_from_node_id
                     );
                     // Mark as processed upon successful completion
-                    await supabaseAdmin.from('scheduled_automation_tasks').update({ status: 'processed' }).eq('id', task.id);
+                    const processedPayload: Database['public']['Tables']['scheduled_automation_tasks']['Update'] = { status: 'processed' };
+                    await supabaseAdmin.from('scheduled_automation_tasks').update(processedPayload).eq('id', task.id);
                     processed++;
                 } else {
                     throw new Error(`Could not find required data for task ${task.id}. Automation: ${!!automation}, Contact: ${!!contact}, Connection: ${!!connection}`);

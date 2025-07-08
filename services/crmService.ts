@@ -50,7 +50,7 @@ export async function createBoard(name: string): Promise<CrmBoard> {
             id: uuidv4(),
             title: col.title,
             tagsToApply: [],
-        }))
+        })) as any,
     };
     const { data, error } = await supabase.from('funnels').insert([newBoardData]).select().single();
     if (error) {
@@ -68,7 +68,7 @@ export async function createRawBoard(board: Omit<CrmBoard, 'id'> & { id?: string
     const user = authData?.user;
     if (!user) throw new Error("Usuário não autenticado.");
 
-    const boardWithUser: Database['public']['Tables']['funnels']['Insert'] = { ...board, user_id: user.id };
+    const boardWithUser: Database['public']['Tables']['funnels']['Insert'] = { ...board, user_id: user.id, columns: board.columns as any };
     const { data, error } = await supabase.from('funnels').insert([boardWithUser]).select().single();
     if (error) {
         console.error("Error creating raw funnel (as board):", error);
@@ -80,7 +80,7 @@ export async function createRawBoard(board: Omit<CrmBoard, 'id'> & { id?: string
 export async function updateBoard(board: CrmBoard): Promise<void> {
     const { id, ...updateData } = board;
     // RLS protects this update
-    const { error } = await supabase.from('funnels').update(updateData).eq('id', id);
+    const { error } = await supabase.from('funnels').update({ ...updateData, columns: updateData.columns as any }).eq('id', id);
     if (error) {
         console.error("Error updating funnel (as board):", error);
         throw new Error(`Falha ao atualizar board (funnel) ${id}: ${error.message}`);

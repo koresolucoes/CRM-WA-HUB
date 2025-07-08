@@ -1,3 +1,4 @@
+
 // api/execute-automation-webhook.ts
 import { runAutomations } from '../../services/automationService';
 import { supabaseAdmin } from '../../services/supabaseAdminClient';
@@ -62,7 +63,7 @@ export default async function handler(req: any, res: any) {
                     lastSample: body,
                     isListening: false,
                 };
-                const { error } = await supabaseAdmin.from('automations').update({ nodes: updatedNodes }).eq('id', targetAutomation.id);
+                const { error } = await supabaseAdmin.from('automations').update({ nodes: updatedNodes as any }).eq('id', targetAutomation.id);
                 if (error) throw error;
                 console.log(`Webhook sample captured for automation: ${targetAutomation.name}`);
                 return res.status(200).json({ success: true, message: 'Sample captured successfully.' });
@@ -89,7 +90,7 @@ export default async function handler(req: any, res: any) {
                 tags: body.tags || [],
                 custom_fields: body,
             };
-            const { data: newContact, error: createError } = await supabaseAdmin.from('contacts').insert(newContactData).select().single();
+            const { data: newContact, error: createError } = await supabaseAdmin.from('contacts').insert([newContactData]).select().single();
             if (createError) throw createError;
             contact = newContact;
         }

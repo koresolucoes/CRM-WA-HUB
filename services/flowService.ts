@@ -40,8 +40,8 @@ const mapFlowToDb = (appFlow: Partial<WhatsAppFlow & { user_id?: string }>): Dat
     origin: appFlow.origin,
     version: appFlow.version,
     data_api_version: appFlow.data_api_version,
-    routing_model: appFlow.routing_model || {},
-    screens: appFlow.screens || [],
+    routing_model: appFlow.routing_model as any || {},
+    screens: appFlow.screens as any || [],
 });
 
 export async function getFlows(): Promise<WhatsAppFlow[]> {
@@ -94,7 +94,7 @@ export async function addFlow(): Promise<WhatsAppFlow> {
         version: "7.1",
         data_api_version: "3.0",
         routing_model: {},
-        screens: [newScreen],
+        screens: [newScreen] as any,
     };
 
     const { data, error } = await supabase.from('whatsapp_flows').insert([newFlow]).select().single();

@@ -62,7 +62,7 @@ function mapContactToDb(appContact: Partial<Contact & { user_id?: string }>): Da
     }
 
     if (Object.keys(customFields).length > 0) {
-        dbData.custom_fields = customFields;
+        dbData.custom_fields = customFields as any;
     }
 
     return dbData;
@@ -146,7 +146,7 @@ export async function addContact(contact: Partial<Omit<Contact, 'id'>>): Promise
         phone: contact.phone!,
         tags: contact.tags || [],
         funnel_column_id: contact.crmStageId || firstStageId,
-        custom_fields: Object.keys(customFields).length > 0 ? customFields : null,
+        custom_fields: Object.keys(customFields).length > 0 ? customFields as any : null,
     };
 
     const { data: newContactData, error } = await supabase.from('contacts').insert([dbObject]).select().single();
@@ -236,7 +236,7 @@ export async function addMultipleContacts(newContacts: SheetContact[], tagsToApp
             phone: c.phone,
             tags: [...new Set([...fileTags, ...tagsToApply])],
             funnel_column_id: firstStageId,
-            custom_fields: Object.keys(custom_fields).length > 0 ? (custom_fields as Json) : undefined,
+            custom_fields: Object.keys(custom_fields).length > 0 ? (custom_fields as any) : undefined,
         };
     });
 

@@ -53,7 +53,7 @@ export async function addTemplate(): Promise<MessageTemplate> {
     status: 'DRAFT',
     components: [
         { type: 'BODY', text: 'Corpo da sua mensagem aqui. Use {{1}} para variáveis.' }
-    ] as unknown as Json,
+    ] as any,
   };
 
   const { data, error } = await supabase.from('message_templates').insert([newTemplateDataForDb]).select().single();
@@ -78,7 +78,7 @@ export async function updateTemplate(updatedTemplate: MessageTemplate): Promise<
       ...updateData,
       meta_id: metaId,
       rejection_reason: rejectionReason,
-      components: updatedTemplate.components as unknown as Json,
+      components: updatedTemplate.components as any,
   };
 
   const { error } = await supabase

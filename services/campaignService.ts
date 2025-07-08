@@ -4,9 +4,8 @@ import type { Campaign, CampaignLog, CampaignStatus, CampaignTarget } from '../t
 import { supabase } from './supabaseClient';
 import type { Json, Database } from './database.types';
 
-function mapCampaignToDb(campaign: Partial<Campaign & { user_id?: string }>): Database['public']['Tables']['campaigns']['Update'] {
+function mapCampaignToDb(campaign: Partial<Campaign>): Database['public']['Tables']['campaigns']['Update'] {
     return {
-        user_id: campaign.user_id,
         name: campaign.name,
         status: campaign.status,
         sent_count: campaign.sentCount,
@@ -15,8 +14,8 @@ function mapCampaignToDb(campaign: Partial<Campaign & { user_id?: string }>): Da
         read_rate: campaign.readRate,
         sent_date: campaign.sentDate,
         template_id: campaign.templateId,
-        target: campaign.target as unknown as Json,
-        logs: campaign.logs as unknown as Json,
+        target: campaign.target as any,
+        logs: campaign.logs as any,
     };
 }
 
@@ -70,12 +69,12 @@ export async function addCampaign(campaign: Omit<Campaign, 'id' | 'user_id'>): P
         status: campaign.status,
         sent_date: campaign.sentDate,
         template_id: campaign.templateId,
-        target: campaign.target as Json,
+        target: campaign.target as any,
         sent_count: campaign.sentCount,
         failed_count: campaign.failedCount,
         total_count: campaign.totalCount,
         read_rate: campaign.readRate,
-        logs: campaign.logs as Json,
+        logs: campaign.logs as any,
     };
 
     const { data, error } = await supabase.from('campaigns').insert([dbObject]).select().single();
@@ -90,7 +89,7 @@ export async function addCampaign(campaign: Omit<Campaign, 'id' | 'user_id'>): P
 }
 
 export async function updateCampaign(updatedCampaign: Campaign): Promise<void> {
-    const { id, ...campaignData } = updatedCampaign;
+    const { id, user_id, ...campaignData } = updatedCampaign;
     // RLS will ensure user can only update their own campaigns.
     const { error } = await supabase.from('campaigns').update(mapCampaignToDb(campaignData)).eq('id', id);
     if (error) {
@@ -126,7 +125,7 @@ export async function addCampaignLog(campaignId: number, log: Omit<CampaignLog, 
         // RLS protects this update.
         const { error } = await supabase
             .from('campaigns')
-            .update({ logs: updatedLogs as unknown as Json })
+            .update({ logs: updatedLogs as any })
             .eq('id', campaignId);
 
         if (error) {

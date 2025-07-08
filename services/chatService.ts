@@ -46,7 +46,7 @@ async function updateMessageStatus(messageId: string, contactId: number, status:
             // RLS protects this update
             const { error } = await supabase
                 .from('conversations')
-                .update({ messages: convo.messages, updated_at: new Date().toISOString() })
+                .update({ messages: convo.messages as any, updated_at: new Date().toISOString() })
                 .eq('contact_id', contactId);
             if (error) throw new Error(error.message);
             if (typeof window !== 'undefined') {
@@ -92,14 +92,14 @@ export async function addMessage(contactId: number, message: Omit<ChatMessage, '
         
         const { error } = await client
             .from('conversations')
-            .update({ messages: updatedMessages, unread_count: updatedUnreadCount, updated_at: new Date().toISOString() })
+            .update({ messages: updatedMessages as any, unread_count: updatedUnreadCount, updated_at: new Date().toISOString() })
             .eq('id', convo.id);
         if (error) throw new Error(error.message);
     } else {
         const newConvo: Database['public']['Tables']['conversations']['Insert'] = {
             user_id: userId,
             contact_id: contactId,
-            messages: [newMessage],
+            messages: [newMessage] as any,
             unread_count: message.sender === 'contact' ? 1 : 0,
             updated_at: new Date().toISOString()
         };

@@ -1,5 +1,4 @@
 
-
 import { v4 as uuidv4 } from 'uuid';
 import { FlowStatus } from '../types';
 import type { MessageTemplate, AnalyticsDataPoint, WhatsAppFlow, Button, ActionSendMessageData, MetaConnection } from '../types';
@@ -136,19 +135,24 @@ export async function saveConnection(connection: Omit<MetaConnection, 'id' | 'us
     const user = authData?.user;
     if (!user) throw new Error("Usuário não autenticado.");
 
-    const connectionData: Database['public']['Tables']['meta_connections']['Insert'] = {
-        user_id: user.id,
-        name: connection.name,
-        waba_id: connection.wabaId,
-        phone_number_id: connection.phoneNumberId,
-        api_token: connection.apiToken
-    };
-    
     if ('id' in connection && connection.id) {
-        const { error } = await supabase.from('meta_connections').update(connectionData).eq('id', connection.id).eq('user_id', user.id);
+        const updatePayload: Database['public']['Tables']['meta_connections']['Update'] = {
+            name: connection.name,
+            waba_id: connection.wabaId,
+            phone_number_id: connection.phoneNumberId,
+            api_token: connection.apiToken
+        };
+        const { error } = await supabase.from('meta_connections').update(updatePayload).eq('id', connection.id).eq('user_id', user.id);
         if (error) throw new Error(error.message);
     } else {
-        const { error } = await supabase.from('meta_connections').insert([connectionData]);
+        const insertPayload: Database['public']['Tables']['meta_connections']['Insert'] = {
+            user_id: user.id,
+            name: connection.name,
+            waba_id: connection.wabaId,
+            phone_number_id: connection.phoneNumberId,
+            api_token: connection.apiToken
+        };
+        const { error } = await supabase.from('meta_connections').insert([insertPayload]);
         if (error) throw new Error(error.message);
     }
 }

@@ -82,7 +82,7 @@ export async function addAutomation(details: {
         execution_stats: {},
     };
     
-    const { data, error } = await supabase.from('automations').insert(newAutomationData).select().single();
+    const { data, error } = await supabase.from('automations').insert([newAutomationData]).select().single();
     
     if (error) {
         console.error("Error adding automation:", error);
@@ -112,11 +112,11 @@ export async function updateAutomation(updatedAutomation: Automation): Promise<v
     const updateData: Database['public']['Tables']['automations']['Update'] = {
         name,
         status,
-        nodes: nodes as unknown as Json,
-        edges: edges as unknown as Json,
+        nodes: nodes as any,
+        edges: edges as any,
         allow_reactivation: allowReactivation,
         block_on_open_chat: blockOnOpenChat,
-        execution_stats: executionStats as unknown as Json,
+        execution_stats: executionStats as any,
     };
     // RLS protects this update
     const { error } = await supabase
@@ -274,7 +274,7 @@ export async function executeAutomation(
                             resume_from_node_id,
                             execute_at: execute_at.toISOString(),
                             meta_connection_id: connection.id,
-                            context: initialContext as unknown as Json,
+                            context: initialContext as any,
                             status: 'pending'
                         };
                         await supabase.from('scheduled_automation_tasks').insert([task]);
