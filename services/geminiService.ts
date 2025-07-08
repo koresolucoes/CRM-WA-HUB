@@ -1,12 +1,17 @@
 import { GoogleGenAI } from "@google/genai";
 
 let ai: GoogleGenAI | null = null;
+
+// Para aplicações Vite, as variáveis de ambiente expostas ao cliente
+// DEVEM começar com o prefixo VITE_.
+const apiKey = import.meta.env.VITE_API_KEY;
+
 try {
   // A chave de API DEVE ser fornecida como uma variável de ambiente.
-  if (!process.env.API_KEY) {
-    throw new Error("A chave de API do Gemini (API_KEY) não está configurada no ambiente.");
+  if (!apiKey) {
+    throw new Error("A chave de API do Gemini (VITE_API_KEY) não está configurada no ambiente. Adicione-a ao seu arquivo .env ou às configurações do seu provedor de hospedagem.");
   }
-  ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  ai = new GoogleGenAI({ apiKey: apiKey });
 } catch (e) {
   console.error("Falha ao inicializar o cliente Gemini:", e);
   // ai permanece nulo
