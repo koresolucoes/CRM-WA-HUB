@@ -1,6 +1,8 @@
 
 
 
+import type React from 'react';
+
 export enum CampaignStatus {
   CONCLUIDA = 'Concluída',
   ENVIANDO = 'Enviando',

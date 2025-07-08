@@ -1,5 +1,6 @@
 
 
+
 import { v4 as uuidv4 } from 'uuid';
 import type {
     Automation, AutomationNode, TriggerCrmStageChangedData, TriggerTagAddedData, AutomationTriggerType,
@@ -411,18 +412,38 @@ export async function executeAutomation(
 }
 
 
-export async function runAutomations(triggerType: AutomationTriggerType, context: any) {
+export async function runAutomations(triggerType: AutomationTriggerType, context: any, adminContext?: { userId: string, connection: MetaConnection }) {
     const { contactId } = context;
     const contact = await getContactById(contactId);
     if (!contact || contact.isOptedOutOfAutomations) return;
 
-    const connection = await getActiveConnection();
+    // Se o adminContext for fornecido, use-o. Caso contrário, obtenha a conexão do usuário logado.
+    const connection = adminContext?.connection || await getActiveConnection();
     if (!connection) {
-        console.warn("Cannot run automations: No active Meta connection.");
+        console.warn(`Cannot run automations for user ${adminContext?.userId || 'logged-in user'}: No active Meta connection.`);
         return;
     }
     
-    const allAutomations = await getAutomations();
+    // Use o cliente relevante para buscar as automações.
+    const automationsClient = adminContext ? supabase.from('automations').select('*').eq('user_id', adminContext.userId) : supabase.from('automations').select('*');
+    const { data: allAutomationsData, error } = await automationsClient;
+
+    if (error) {
+        console.error("Error fetching automations:", error);
+        return;
+    }
+
+    const allAutomations: Automation[] = (allAutomationsData || []).map(a => ({
+        id: a.id,
+        name: a.name,
+        status: a.status as AutomationStatus,
+        nodes: a.nodes as unknown as AutomationNode[],
+        edges: a.edges as any,
+        createdAt: a.created_at,
+        allowReactivation: a.allow_reactivation,
+        blockOnOpenChat: a.block_on_open_chat,
+        executionStats: a.execution_stats as any,
+    }));
     
     const automationsToRun = allAutomations.filter(automation => {
         if (automation.status !== AutomationStatus.ACTIVE) return false;

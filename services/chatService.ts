@@ -1,10 +1,12 @@
 
 
+
 import { v4 as uuidv4 } from 'uuid';
 import type { Conversation, ChatMessage, Contact, ActionSendMessageData } from '../types';
 import { getActiveConnection, sendTextMessage, sendFlowMessage as sendFlowMessageApi, type MetaConnection } from './metaService';
 import { getContactById, getContacts } from './contactService';
 import { supabase } from './supabaseClient';
+import { supabaseAdmin } from './supabaseAdminClient';
 
 export async function getConversations(): Promise<Conversation[]> {
     // RLS filters by user_id
@@ -54,12 +56,25 @@ async function updateMessageStatus(messageId: string, contactId: number, status:
     }
 }
 
-export async function addMessage(contactId: number, message: Omit<ChatMessage, 'id' | 'timestamp'>): Promise<ChatMessage> {
-    const { data: authData } = await supabase.auth.getUser();
-    const user = authData?.user;
-    if (!user) throw new Error("Usuário não autenticado.");
+export async function addMessage(contactId: number, message: Omit<ChatMessage, 'id' | 'timestamp'>, providedUserId?: string): Promise<ChatMessage> {
+    let userId = providedUserId;
 
-    let convo = await getConversationByContactId(contactId);
+    // Se um userId não for fornecido (ex: chamada do frontend), busca o usuário autenticado.
+    if (!userId) {
+        const { data: authData } = await supabase.auth.getUser();
+        userId = authData.user?.id;
+    }
+
+    if (!userId) throw new Error("Usuário não autenticado ou ID do usuário não fornecido.");
+
+    // Usa o cliente admin para operações de backend para garantir permissões.
+    const client = providedUserId ? supabaseAdmin : supabase;
+
+    const { data: convo, error: getError } = await client.from('conversations').select('*').eq('contact_id', contactId).eq('user_id', userId).single();
+     if (getError && getError.code !== 'PGRST116') {
+        throw getError;
+    }
+
 
     const newMessage: ChatMessage = {
         id: uuidv4(),
@@ -68,24 +83,23 @@ export async function addMessage(contactId: number, message: Omit<ChatMessage, '
     };
 
     if (convo) {
-        convo.messages.push(newMessage);
-        if (message.sender === 'contact') {
-            convo.unreadCount = (convo.unreadCount || 0) + 1;
-        }
-        const { error } = await supabase
+        const updatedMessages = [...(convo.messages as any[]), newMessage];
+        const updatedUnreadCount = message.sender === 'contact' ? (convo.unread_count || 0) + 1 : convo.unread_count;
+        
+        const { error } = await client
             .from('conversations')
-            .update({ messages: convo.messages, unread_count: convo.unreadCount, updated_at: new Date().toISOString() })
-            .eq('contact_id', contactId);
+            .update({ messages: updatedMessages, unread_count: updatedUnreadCount, updated_at: new Date().toISOString() })
+            .eq('id', convo.id);
         if (error) throw new Error(error.message);
     } else {
         const newConvo = {
-            user_id: user.id,
+            user_id: userId,
             contact_id: contactId,
             messages: [newMessage],
             unread_count: message.sender === 'contact' ? 1 : 0,
             updated_at: new Date().toISOString()
         };
-        const { error } = await supabase.from('conversations').insert([newConvo]);
+        const { error } = await client.from('conversations').insert([newConvo]);
         if (error) throw new Error(error.message);
     }
     
@@ -155,7 +169,7 @@ export async function sendAutomatedMessage(contactId: number, text: string, cont
         text: interpolatedText,
         sender: 'me',
         status: 'sent',
-    });
+    }, currentContact.user_id);
 
     try {
         await sendTextMessage(activeConnection, currentContact.phone, interpolatedText);

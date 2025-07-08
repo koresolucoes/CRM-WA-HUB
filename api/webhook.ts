@@ -2,8 +2,7 @@
 // Ele irá lidar com as mensagens recebidas, encontrar o contato correspondente, adicionar a mensagem à conversa,
 // e acionar quaisquer automações relevantes.
 
-import { supabase } from '../services/supabaseClient';
-import { getContacts, addContact } from '../services/contactService';
+import { supabaseAdmin } from '../services/supabaseAdminClient';
 import { addMessage } from '../services/chatService';
 import { runAutomations } from '../services/automationService';
 
@@ -40,8 +39,6 @@ export default async function handler(req: any, res: any) {
         for (const change of entry.changes) {
           if (change.field === 'messages' && change.value.messages) {
             
-            const allContacts = await getContacts();
-            
             for (const message of change.value.messages) {
               // We only care about incoming text messages for now.
               if (message.type === 'text') {
@@ -49,30 +46,54 @@ export default async function handler(req: any, res: any) {
                 const text = message.text.body;
 
                 try {
-                  let contact = allContacts.find(c => c.phone && c.phone.replace(/\D/g, '') === contactPhone.replace(/\D/g, ''));
+                  // Use admin client to bypass RLS and search all contacts
+                  const { data: contacts, error: contactError } = await supabaseAdmin
+                    .from('contacts')
+                    .select('*, user_id')
+                    .eq('phone', contactPhone);
                   
-                  if (!contact) {
-                    const contactName = change.value.contacts?.[0]?.profile?.name || `Novo Contato ${contactPhone.slice(-4)}`;
-                    console.log(`Creating new contact for ${contactPhone} with name ${contactName}`);
-                    
-                    contact = await addContact({
-                        phone: contactPhone,
-                        name: contactName,
-                        tags: ['novo-contato-webhook']
-                    });
-                    
-                    await runAutomations('contact_created', { contactId: contact.id });
-                    await runAutomations('tag_added', { contactId: contact.id, tagName: 'novo-contato-webhook' });
+                  if (contactError) throw contactError;
+
+                  let contact = contacts?.[0];
+                  let userId;
+
+                  if (contact) {
+                    userId = contact.user_id;
+                  } else {
+                    // This case is complex: which user does the new contact belong to?
+                    // Without more context (e.g., a lookup by phone number ID), we can't reliably assign a user.
+                    // For now, we'll log this and skip. In a real multi-tenant app, this would need a clear strategy.
+                    console.warn(`Received message from unknown number ${contactPhone} not associated with any user. Skipping.`);
+                    continue; 
                   }
                   
-                  // Now contact is guaranteed to exist
+                  // Now contact and userId are guaranteed to exist
                   await addMessage(contact.id, {
                       text,
                       sender: 'contact',
                       status: 'delivered',
-                  });
-                  await runAutomations('context_message', { contactId: contact.id, messageText: text });
-                  console.log(`Successfully processed message from ${contactPhone}`);
+                  }, userId);
+
+                  // Fetch the user's active connection to pass to the automation service
+                  const { data: connections } = await supabaseAdmin.from('meta_connections').select('*').eq('user_id', userId);
+                  
+                  // A simple strategy: use the first connection found for this user.
+                  const activeConnection = connections?.[0] ? {
+                      id: connections[0].id,
+                      user_id: connections[0].user_id,
+                      name: connections[0].name,
+                      wabaId: connections[0].waba_id,
+                      phoneNumberId: connections[0].phone_number_id,
+                      apiToken: connections[0].api_token,
+                  } : null;
+
+                  if (activeConnection) {
+                     await runAutomations('context_message', { contactId: contact.id, messageText: text }, { userId, connection: activeConnection });
+                  } else {
+                      console.warn(`No active connection found for user ${userId}. Cannot run automations.`);
+                  }
+
+                  console.log(`Successfully processed message from ${contactPhone} for user ${userId}`);
 
                 } catch (error) {
                    console.error(`Failed to process incoming message from ${contactPhone}:`, error);
