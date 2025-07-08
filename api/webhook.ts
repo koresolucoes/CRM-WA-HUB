@@ -47,6 +47,9 @@ export default async function handler(req: any, res: any) {
                 const text = message.text.body;
 
                 try {
+                  if (!supabaseAdmin) {
+                    throw new Error('Supabase admin client not initialized. Check server environment variables.');
+                  }
                   // Use admin client to bypass RLS and search all contacts
                   const { data: contacts, error: contactError } = await supabaseAdmin
                     .from('contacts')

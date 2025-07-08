@@ -1,9 +1,8 @@
-
 // api/execute-automation-webhook.ts
-import { runAutomations } from '../../services/automationService';
-import { supabaseAdmin } from '../../services/supabaseAdminClient';
-import type { Automation, TriggerWebhookData } from '../../types';
-import type { Database } from '../../services/database.types';
+import { runAutomations } from '../services/automationService';
+import { supabaseAdmin } from '../services/supabaseAdminClient';
+import type { TriggerWebhookData } from '../types';
+import type { Database } from '../services/database.types';
 
 export default async function handler(req: any, res: any) {
     if (req.method !== 'POST') {
