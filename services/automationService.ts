@@ -10,7 +10,7 @@ import type {
 } from '../types';
 import { AutomationStatus } from '../types';
 import { supabase } from './supabaseClient';
-import type { Json } from './database.types';
+import type { Json, Database } from './database.types';
 import { getContactById, updateContact, setContactOptOutStatus, moveContactToCrmStage } from './contactService';
 import { sendAutomatedMessage, sendFlowMessage } from './chatService';
 import { sendMessage as sendTemplateMessage, getMessageTemplates, getActiveConnection } from './metaService';
@@ -69,7 +69,7 @@ export async function addAutomation(details: {
     const user = authData?.user;
     if (!user) throw new Error("Usuário não autenticado.");
 
-    const newAutomationData = {
+    const newAutomationData: Database['public']['Tables']['automations']['Insert'] = {
         id: uuidv4(),
         user_id: user.id,
         name: details.name,
@@ -82,7 +82,7 @@ export async function addAutomation(details: {
         execution_stats: {},
     };
     
-    const { data, error } = await supabase.from('automations').insert(newAutomationData as any).select().single();
+    const { data, error } = await supabase.from('automations').insert(newAutomationData).select().single();
     
     if (error) {
         console.error("Error adding automation:", error);
@@ -109,10 +109,19 @@ export async function addAutomation(details: {
 
 export async function updateAutomation(updatedAutomation: Automation): Promise<void> {
     const { id, name, status, nodes, edges, allowReactivation, blockOnOpenChat, executionStats } = updatedAutomation;
+    const updateData: Database['public']['Tables']['automations']['Update'] = {
+        name,
+        status,
+        nodes: nodes as unknown as Json,
+        edges: edges as unknown as Json,
+        allow_reactivation: allowReactivation,
+        block_on_open_chat: blockOnOpenChat,
+        execution_stats: executionStats as unknown as Json,
+    };
     // RLS protects this update
     const { error } = await supabase
         .from('automations')
-        .update({ name, status, nodes: nodes as unknown as Json, edges: edges as unknown as Json, allow_reactivation: allowReactivation, block_on_open_chat: blockOnOpenChat, execution_stats: executionStats as unknown as Json } as any)
+        .update(updateData)
         .eq('id', id);
     if (error) {
         console.error("Error updating automation:", error);
@@ -258,7 +267,7 @@ export async function executeAutomation(
                     const resume_from_node_id = nextNodes?.[0];
                     
                     if (resume_from_node_id) {
-                        await supabase.from('scheduled_automation_tasks').insert([{
+                        const task: Database['public']['Tables']['scheduled_automation_tasks']['Insert'] = {
                             user_id: contact.user_id,
                             contact_id: contact.id,
                             automation_id: automationToExecute.id,
@@ -267,7 +276,8 @@ export async function executeAutomation(
                             meta_connection_id: connection.id,
                             context: initialContext as unknown as Json,
                             status: 'pending'
-                        } as any]);
+                        };
+                        await supabase.from('scheduled_automation_tasks').insert([task]);
                         stats[nodeId].success++;
                         await updateAutomation(automationToExecute);
                         return;

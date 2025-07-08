@@ -17,7 +17,8 @@ export async function getTemplates(): Promise<MessageTemplate[]> {
     throw error;
   }
   return (data || []).map(t => ({
-      ...(t as any),
+      ...t,
+      components: t.components as any,
       metaId: t.meta_id,
       rejectionReason: t.rejection_reason
   }));
@@ -32,7 +33,8 @@ export async function getTemplateById(id: string): Promise<MessageTemplate | und
         throw error;
     }
     return data ? {
-      ...(data as any),
+      ...data,
+      components: data.components as any,
       metaId: data.meta_id,
       rejectionReason: data.rejection_reason,
     } : undefined;
@@ -43,7 +45,7 @@ export async function addTemplate(): Promise<MessageTemplate> {
   const user = authData?.user;
   if (!user) throw new Error("Usuário não autenticado.");
 
-  const newTemplateDataForDb = {
+  const newTemplateDataForDb: Database['public']['Tables']['message_templates']['Insert'] = {
     user_id: user.id,
     name: 'novo_modelo_sem_titulo',
     category: 'MARKETING',
@@ -54,7 +56,7 @@ export async function addTemplate(): Promise<MessageTemplate> {
     ] as unknown as Json,
   };
 
-  const { data, error } = await supabase.from('message_templates').insert([newTemplateDataForDb as any]).select().single();
+  const { data, error } = await supabase.from('message_templates').insert([newTemplateDataForDb]).select().single();
 
   if (error) {
     console.error("Error adding template draft:", error);
@@ -72,7 +74,7 @@ export async function addTemplate(): Promise<MessageTemplate> {
 export async function updateTemplate(updatedTemplate: MessageTemplate): Promise<void> {
   const { id, metaId, rejectionReason, ...updateData } = updatedTemplate;
   // RLS will protect this update
-  const dbUpdateData = {
+  const dbUpdateData: Database['public']['Tables']['message_templates']['Update'] = {
       ...updateData,
       meta_id: metaId,
       rejection_reason: rejectionReason,
@@ -81,7 +83,7 @@ export async function updateTemplate(updatedTemplate: MessageTemplate): Promise<
 
   const { error } = await supabase
     .from('message_templates')
-    .update(dbUpdateData as any)
+    .update(dbUpdateData)
     .eq('id', id);
   
   if (error) {

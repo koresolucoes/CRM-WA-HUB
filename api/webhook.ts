@@ -5,6 +5,7 @@
 import { supabaseAdmin } from '../services/supabaseAdminClient';
 import { addMessage } from '../services/chatService';
 import { runAutomations } from '../services/automationService';
+import { MetaConnection } from '../types';
 
 // --- Environment Variables ---
 const { META_VERIFY_TOKEN } = process.env;
@@ -78,13 +79,14 @@ export default async function handler(req: any, res: any) {
                   const { data: connections } = await supabaseAdmin.from('meta_connections').select('*').eq('user_id', userId);
                   
                   // A simple strategy: use the first connection found for this user.
-                  const activeConnection = connections?.[0] ? {
-                      id: connections[0].id,
-                      user_id: connections[0].user_id,
-                      name: connections[0].name,
-                      wabaId: connections[0].waba_id,
-                      phoneNumberId: connections[0].phone_number_id,
-                      apiToken: connections[0].api_token,
+                  const connectionData = connections?.[0];
+                  const activeConnection: MetaConnection | null = connectionData ? {
+                      id: connectionData.id,
+                      user_id: connectionData.user_id,
+                      name: connectionData.name,
+                      wabaId: connectionData.waba_id,
+                      phoneNumberId: connectionData.phone_number_id,
+                      apiToken: connectionData.api_token,
                   } : null;
 
                   if (activeConnection) {

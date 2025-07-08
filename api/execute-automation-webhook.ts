@@ -1,8 +1,8 @@
 // api/execute-automation-webhook.ts
-import { updateAutomation } from '../services/automationService';
-import { runAutomations } from '../services/automationService';
-import { supabaseAdmin } from '../services/supabaseAdminClient';
-import type { Automation, TriggerWebhookData } from '../types';
+import { runAutomations } from '../../services/automationService';
+import { supabaseAdmin } from '../../services/supabaseAdminClient';
+import type { Automation, TriggerWebhookData } from '../../types';
+import type { Database } from '../../services/database.types';
 
 export default async function handler(req: any, res: any) {
     if (req.method !== 'POST') {
@@ -55,14 +55,15 @@ export default async function handler(req: any, res: any) {
         if ((triggerNodeRef.data as TriggerWebhookData).isListening) {
             const nodeIndex = (targetAutomation.nodes as any[]).findIndex(n => n.id === triggerNodeRef.id);
             if (nodeIndex > -1) {
-                const fullAutomationForUpdate = { ...targetAutomation, nodes: [...(targetAutomation.nodes as any[])] };
-                const oldData = fullAutomationForUpdate.nodes[nodeIndex].data as TriggerWebhookData;
-                fullAutomationForUpdate.nodes[nodeIndex].data = {
+                const updatedNodes = [...(targetAutomation.nodes as any[])];
+                const oldData = updatedNodes[nodeIndex].data as TriggerWebhookData;
+                updatedNodes[nodeIndex].data = {
                     ...oldData,
                     lastSample: body,
                     isListening: false,
                 };
-                await updateAutomation(fullAutomationForUpdate as unknown as Automation);
+                const { error } = await supabaseAdmin.from('automations').update({ nodes: updatedNodes }).eq('id', targetAutomation.id);
+                if (error) throw error;
                 console.log(`Webhook sample captured for automation: ${targetAutomation.name}`);
                 return res.status(200).json({ success: true, message: 'Sample captured successfully.' });
             }
@@ -81,14 +82,14 @@ export default async function handler(req: any, res: any) {
         
         if (!contact) {
             isNewContact = true;
-            const newContactData = {
+            const newContactData: Database['public']['Tables']['contacts']['Insert'] = {
                 user_id: userId,
                 phone: phone,
                 name: body.name || `Contato Webhook ${phone.slice(-4)}`,
                 tags: body.tags || [],
                 custom_fields: body,
             };
-            const { data: newContact, error: createError } = await supabaseAdmin.from('contacts').insert(newContactData as any).select().single();
+            const { data: newContact, error: createError } = await supabaseAdmin.from('contacts').insert(newContactData).select().single();
             if (createError) throw createError;
             contact = newContact;
         }

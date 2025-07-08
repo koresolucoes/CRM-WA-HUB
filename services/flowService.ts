@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { supabase } from './supabaseClient';
 import type { WhatsAppFlow, FlowScreen, FlowComponent } from '../types';
 import { FlowStatus } from '../types';
+import type { Database } from './database.types';
 import { 
     getActiveConnection,
     getWhatsAppFlows as getFlowsFromMeta, 
@@ -30,7 +31,7 @@ const mapFlowFromDb = (dbFlow: any): WhatsAppFlow => ({
     screens: dbFlow.screens || [],
 });
 
-const mapFlowToDb = (appFlow: Partial<WhatsAppFlow & { user_id?: string }>) => ({
+const mapFlowToDb = (appFlow: Partial<WhatsAppFlow & { user_id?: string }>): Database['public']['Tables']['whatsapp_flows']['Update'] => ({
     user_id: appFlow.user_id,
     meta_flow_id: appFlow.metaFlowId,
     name: appFlow.name,
@@ -85,7 +86,7 @@ export async function addFlow(): Promise<WhatsAppFlow> {
         }
     };
 
-    const newFlow: Omit<WhatsAppFlow, 'id'> & { user_id: string } = {
+    const newFlow: Database['public']['Tables']['whatsapp_flows']['Insert'] = {
         user_id: user.id,
         name: 'Agendamento de Test-Drive',
         status: FlowStatus.DRAFT,
@@ -96,7 +97,7 @@ export async function addFlow(): Promise<WhatsAppFlow> {
         screens: [newScreen],
     };
 
-    const { data, error } = await supabase.from('whatsapp_flows').insert([mapFlowToDb(newFlow) as any]).select().single();
+    const { data, error } = await supabase.from('whatsapp_flows').insert([newFlow]).select().single();
     if (error) throw error;
     
     window.dispatchEvent(new CustomEvent('localDataChanged'));
@@ -108,7 +109,7 @@ export async function updateFlow(flow: WhatsAppFlow): Promise<WhatsAppFlow> {
     // RLS protects this update
     const { data, error } = await supabase
         .from('whatsapp_flows')
-        .update(mapFlowToDb(updateData) as any)
+        .update(mapFlowToDb(updateData))
         .eq('id', id)
         .select()
         .single();
@@ -156,7 +157,7 @@ export async function syncFlowsWithMeta(): Promise<void> {
         const existingLocal = localFlows.find(lf => lf.metaFlowId === metaFlow.metaFlowId);
         
         if (existingLocal) {
-            const updateData = {
+            const updateData: Database['public']['Tables']['whatsapp_flows']['Update'] = {
                 name: metaFlow.name,
                 status: metaFlow.status,
                 version: metaFlow.version || existingLocal.version,
@@ -164,13 +165,13 @@ export async function syncFlowsWithMeta(): Promise<void> {
                 endpoint_uri: metaFlow.endpointUri,
                 origin: 'meta',
             };
-            return supabase.from('whatsapp_flows').update(updateData as any).eq('id', existingLocal.id);
+            return supabase.from('whatsapp_flows').update(updateData).eq('id', existingLocal.id);
         } else {
-            const newFlowData = {
+            const newFlowData: Database['public']['Tables']['whatsapp_flows']['Insert'] = {
                 user_id: user.id,
                 meta_flow_id: metaFlow.metaFlowId,
-                name: metaFlow.name,
-                status: metaFlow.status,
+                name: metaFlow.name!,
+                status: metaFlow.status!,
                 version: metaFlow.version || "7.1",
                 data_api_version: metaFlow.data_api_version || "3.0",
                 endpoint_uri: metaFlow.endpointUri,
@@ -178,7 +179,7 @@ export async function syncFlowsWithMeta(): Promise<void> {
                 routing_model: {},
                 screens: [],
             };
-            return supabase.from('whatsapp_flows').insert([newFlowData as any]);
+            return supabase.from('whatsapp_flows').insert([newFlowData]);
         }
     });
 

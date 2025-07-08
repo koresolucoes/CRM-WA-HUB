@@ -5,6 +5,7 @@ import { FlowStatus } from '../types';
 import type { MessageTemplate, AnalyticsDataPoint, WhatsAppFlow, Button, ActionSendMessageData, MetaConnection } from '../types';
 import { generateFlowJsonForApi } from './flowSerializer';
 import { supabase } from './supabaseClient';
+import type { Database } from './database.types';
 
 
 const ACTIVE_META_CONNECTION_ID_KEY_PREFIX = 'activeMetaConnectionId_';
@@ -135,7 +136,7 @@ export async function saveConnection(connection: Omit<MetaConnection, 'id' | 'us
     const user = authData?.user;
     if (!user) throw new Error("Usuário não autenticado.");
 
-    const connectionData = {
+    const connectionData: Database['public']['Tables']['meta_connections']['Insert'] = {
         user_id: user.id,
         name: connection.name,
         waba_id: connection.wabaId,
@@ -144,10 +145,10 @@ export async function saveConnection(connection: Omit<MetaConnection, 'id' | 'us
     };
     
     if ('id' in connection && connection.id) {
-        const { error } = await supabase.from('meta_connections').update(connectionData as any).eq('id', connection.id).eq('user_id', user.id);
+        const { error } = await supabase.from('meta_connections').update(connectionData).eq('id', connection.id).eq('user_id', user.id);
         if (error) throw new Error(error.message);
     } else {
-        const { error } = await supabase.from('meta_connections').insert([connectionData as any]);
+        const { error } = await supabase.from('meta_connections').insert([connectionData]);
         if (error) throw new Error(error.message);
     }
 }

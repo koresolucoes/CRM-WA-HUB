@@ -5,6 +5,7 @@
 import { supabaseAdmin } from '../../services/supabaseAdminClient';
 import { executeAutomation } from '../../services/automationService';
 import type { Automation, Contact, MetaConnection } from '../../types';
+import type { Database } from '../../services/database.types';
 
 export default async function handler(req: any, res: any) {
     if (req.method !== 'POST') {
@@ -49,7 +50,7 @@ export default async function handler(req: any, res: any) {
         for (const task of tasks) {
             try {
                 // Mark task as 'processing' to prevent duplicate runs
-                await supabaseAdmin.from('scheduled_automation_tasks').update({ status: 'processing' } as any).eq('id', task.id);
+                await supabaseAdmin.from('scheduled_automation_tasks').update({ status: 'processing' }).eq('id', task.id);
                 
                 // Fetch all data using the admin client
                 const [automationRes, contactRes, connectionRes] = await Promise.all([
@@ -83,14 +84,18 @@ export default async function handler(req: any, res: any) {
                         task.resume_from_node_id
                     );
                     // Mark as processed upon successful completion
-                    await supabaseAdmin.from('scheduled_automation_tasks').update({ status: 'processed' } as any).eq('id', task.id);
+                    await supabaseAdmin.from('scheduled_automation_tasks').update({ status: 'processed' }).eq('id', task.id);
                     processed++;
                 } else {
                     throw new Error(`Could not find required data for task ${task.id}. Automation: ${!!automation}, Contact: ${!!contact}, Connection: ${!!connection}`);
                 }
             } catch (taskError) {
                 console.error(`Error processing task ${task.id}:`, taskError);
-                await supabaseAdmin.from('scheduled_automation_tasks').update({ status: 'failed', error_message: (taskError as Error).message } as any).eq('id', task.id);
+                const updatePayload: Database['public']['Tables']['scheduled_automation_tasks']['Update'] = {
+                    status: 'failed',
+                    error_message: (taskError as Error).message,
+                };
+                await supabaseAdmin.from('scheduled_automation_tasks').update(updatePayload).eq('id', task.id);
                 failed++;
             }
         }

@@ -211,7 +211,7 @@ function CampaignsPage(): React.ReactNode {
         return;
     }
 
-    const newCampaignData: Omit<Campaign, 'id'> = {
+    const newCampaignData: Omit<Campaign, 'id' | 'user_id'> = {
         name: campaignName,
         status: CampaignStatus.ENVIANDO,
         sentCount: 0,

@@ -2,6 +2,7 @@
 
 import { supabase } from './supabaseClient';
 import type { Contact, SheetContact, CrmStage } from '../types';
+import type { Database, Json } from './database.types';
 
 function mapContactFromDb(dbContact: any): Contact {
   const contact: Contact = {
@@ -23,7 +24,7 @@ function mapContactFromDb(dbContact: any): Contact {
   return contact;
 }
 
-function mapContactToDb(appContact: Partial<Contact & { user_id?: string }>): any {
+function mapContactToDb(appContact: Partial<Contact & { user_id?: string }>): Database['public']['Tables']['contacts']['Update'] {
     const dbData: { [key: string]: any } = {};
     const customFields: { [key: string]: any } = {};
 
@@ -130,11 +131,25 @@ export async function addContact(contact: Partial<Omit<Contact, 'id'>>): Promise
     const firstBoard = allBoards?.[0];
     const columnsAsArray = firstBoard?.columns as unknown as ({ id: string }[] | undefined);
     const firstStageId = columnsAsArray?.[0]?.id;
+    
+    const standardKeys = new Set(['id', 'user_id', 'name', 'phone', 'tags', 'lastInteraction', 'is24hWindowOpen', 'isOptedOutOfAutomations', 'crmStageId']);
+    const customFields: { [key: string]: any } = {};
+    for(const key in contact) {
+        if(!standardKeys.has(key)) {
+            customFields[key] = (contact as any)[key];
+        }
+    }
 
-    const contactWithUserAndDefaults = { ...contact, user_id: user.id, crmStageId: contact.crmStageId || firstStageId };
-    const contactToInsert = mapContactToDb(contactWithUserAndDefaults);
+    const dbObject: Database['public']['Tables']['contacts']['Insert'] = {
+        user_id: user.id,
+        name: contact.name!,
+        phone: contact.phone!,
+        tags: contact.tags || [],
+        funnel_column_id: contact.crmStageId || firstStageId,
+        custom_fields: Object.keys(customFields).length > 0 ? customFields : null,
+    };
 
-    const { data: newContactData, error } = await supabase.from('contacts').insert([contactToInsert as any]).select().single();
+    const { data: newContactData, error } = await supabase.from('contacts').insert([dbObject]).select().single();
 
     if (error) {
         console.error('Error adding contact:', error);
@@ -153,7 +168,7 @@ export async function updateContact(updatedContact: Partial<Contact> & { id: num
     const dbUpdateData = mapContactToDb(contactData);
     
     // RLS ensures user can only update their own contacts
-    const { error } = await supabase.from('contacts').update(dbUpdateData as any).eq('id', id);
+    const { error } = await supabase.from('contacts').update(dbUpdateData).eq('id', id);
     if (error) {
         console.error('Error updating contact:', error);
         throw new Error(error.message);
@@ -212,7 +227,7 @@ export async function addMultipleContacts(newContacts: SheetContact[], tagsToApp
     const columnsAsArray = firstBoard?.columns as unknown as ({ id: string }[] | undefined);
     const firstStageId = columnsAsArray?.[0]?.id;
 
-    const formattedContacts = contactsToCreate.map(c => {
+    const formattedContacts: Database['public']['Tables']['contacts']['Insert'][] = contactsToCreate.map(c => {
         const custom_fields = Object.fromEntries(Object.entries(c).filter(([key]) => !['name', 'phone', 'tags'].includes(key)));
         const fileTags = (typeof c.tags === 'string' && c.tags) ? c.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
         return {
@@ -221,11 +236,11 @@ export async function addMultipleContacts(newContacts: SheetContact[], tagsToApp
             phone: c.phone,
             tags: [...new Set([...fileTags, ...tagsToApply])],
             funnel_column_id: firstStageId,
-            custom_fields: Object.keys(custom_fields).length > 0 ? custom_fields : undefined,
+            custom_fields: Object.keys(custom_fields).length > 0 ? (custom_fields as Json) : undefined,
         };
     });
 
-    const { data: insertedData, error: insertError } = await supabase.from('contacts').insert(formattedContacts as any).select();
+    const { data: insertedData, error: insertError } = await supabase.from('contacts').insert(formattedContacts).select();
     if (insertError) {
         console.error('Erro ao inserir múltiplos contatos:', insertError);
         throw new Error(insertError.message);
