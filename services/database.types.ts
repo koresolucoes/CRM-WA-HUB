@@ -138,31 +138,31 @@ export interface Database {
       }
       conversations: {
         Row: {
-          id: number;
-          user_id: string;
-          contact_id: number;
-          messages: Json;
-          unread_count: number;
-          updated_at: string;
-          created_at: string;
+          id: number
+          user_id: string
+          contact_id: number
+          messages: Json
+          unread_count: number
+          updated_at: string
+          created_at: string
         }
         Insert: {
-          id?: number;
-          user_id: string;
-          contact_id: number;
-          messages: Json;
-          unread_count?: number;
-          updated_at?: string;
-          created_at?: string;
+          id?: number
+          user_id: string
+          contact_id: number
+          messages: Json
+          unread_count?: number
+          updated_at?: string
+          created_at?: string
         }
         Update: {
-          id?: number;
-          user_id?: string;
-          contact_id?: number;
-          messages?: Json;
-          unread_count?: number;
-          updated_at?: string;
-          created_at?: string;
+          id?: number
+          user_id?: string
+          contact_id?: number
+          messages?: Json
+          unread_count?: number
+          updated_at?: string
+          created_at?: string
         }
       }
       funnels: {
